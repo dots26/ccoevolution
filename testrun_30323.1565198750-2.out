@@ -1,0 +1,41 @@
+
+R version 3.6.1 (2019-07-05) -- "Action of the Toes"
+Copyright (C) 2019 The R Foundation for Statistical Computing
+Platform: x86_64-pc-linux-gnu (64-bit)
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> qq <- as.integer(Sys.getenv("PBS_ARRAYID"))
+> library('ccoevolution')
+Loading required package: foreach
+Loading required package: parallel
+Loading required package: doParallel
+Loading required package: iterators
+> optimum <- rep(13,1000)
+> func <- f4cec
+> 
+> methods <- (qq%%3)+1
+> 
+> seed <- (qq%/%3)*1000
+> 
+> ctrl <- list(lbound=rep(-100,1000),ubound=rep(100,1000),delta=rep(20,1000))
+> 
+> if(methods==1){
++     a <- MOFBVE_surrogate(nVar = 1000,fun=func,budget=1000000,nLevel=4,lbound=rep(-100,1000),ubound=rep(100,1000),o=optimum,seed=seed)
++ }else if(methods==2){
++     a <- cc(nVar = 1000,fun=func,budget=1000000,grouping_control=ctrl,lbound=rep(-100,1000),ubound=rep(100,1000),o=optimum,seed=seed)
++ }else{
++     a <- MOFBVE(nVar = 1000,fun=func,budget=1000000,nLevel=4,lbound=rep(-100,1000),ubound=rep(100,1000),o=optimum,seed=seed)
++ }
+[1] "Ncores=" "32"     
+[1] "Evaluating initial population..."

@@ -2,6 +2,8 @@
 #' This package is an implementation of cooperative coevolution for large scale global optimization.
 #' To use this package, several Python modules must be installed beforehand, namely: numpy and PyGMO.
 #'
+#' Note: This package uses column-major ordering, i.e. an individual should be contained in a single column, each row represents different variable.
+#'
 #' \tabular{ll}{
 #' Package: \tab ccoevolution\cr
 #' Type: \tab Package\cr
