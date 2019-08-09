@@ -40,7 +40,9 @@ differential_grouping <- function(nVar,fun,control=list(),...){
   p1 <- con$lbound
   fun1 <- fun(p1,...)
 
+
   p2 <- t(matrix(rep(p1,length(ungrouped)),ncol=length(ungrouped)))
+  diag(p2) <- center
   fun_repeat <- fun(p2,...)
 
   groupID <- 1
@@ -51,14 +53,12 @@ differential_grouping <- function(nVar,fun,control=list(),...){
 
     p2 <- t(matrix(rep(p1,length(ungrouped)),ncol=length(ungrouped)))
     p2[,i] <- center[i]
-    for(j in (i+1):length(ungrouped)) {
-      p2[,j] <- center[j]
-    }
+    diag( p2) <- center
     funj <- fun(p2[(i+1):length(ungrouped),],...)
 
     for(j in (i+1):length(ungrouped)) {
-      delta1 <- fun_repeat[i] - fun1
-      delta2 <- funj[j-i] - fun_repeat[j]
+      delta1 <- fun_repeat[i] - fun1 #up lo lo - lo lo lo
+      delta2 <- funj[j-i] - fun_repeat[j] #up up lo - lo up lo
 
       if(abs(delta2-delta1)>con$tolerance){
         additional_member <- j
