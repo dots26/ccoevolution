@@ -83,31 +83,37 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,phaseSolver=cmaes,budg
                            groupMember = groupMember,mainfun=fun,...,
                            lower = lbound[groupMember],
                            upper=ubound[groupMember],
-                           control = list(mu=groupSize,lambda=groupSize,maxit=10*groupSize))
+                           control = list(mu=20,lambda=20,maxit=200))
       nEval <- nEval + best$counts[1]
 
       print('updating context vector for interconnection step...')
-      contextVector[groupMember] <- best$par
-      obj <- fun(contextVector,...)
-      nEval <- nEval + 1
-      if(obj < bestObj){
-        if((budget-nEval)>0){ # only update if it doesnt exceed budget
-          bestPop <- contextVector
-          bestObj <- obj
+      print(best$par)
+      if(!is.null(best$par)){
+        contextVector[groupMember] <- best$par
+        obj <- fun(contextVector,...)
+        nEval <- nEval + 1
+        if(obj < bestObj){
+          if((budget-nEval)>0){ # only update if it doesnt exceed budget
+            bestPop <- contextVector
+            bestObj <- obj
+          }
         }
       }
 
       # Interconnection
-      best <- cmaes::cma_es(contextVector,fn = fun,...,lower = lbound,upper=ubound,control = list(mu=groupSize,lambda=groupSize,maxit=5*groupSize))
+      best <- cmaes::cma_es(contextVector,fn = fun,...,lower = lbound,upper=ubound,control = list(mu=20,lambda=20,maxit=100))
       nEval <- nEval + best$counts[1]
       print('Interconnection step finished, updating context vector...')
-      contextVector <- best$par
-      obj <- fun(contextVector,...)
-      nEval <- nEval + 1
-      if(obj < bestObj){
-        if((budget-nEval)>0){ # only update if it doesnt exceed budget
-          bestPop <- contextVector
-          bestObj <- obj
+      print(best$par)
+      if(!is.null(besst$par)){
+        contextVector <- best$par
+        obj <- fun(contextVector,...)
+        nEval <- nEval + 1
+        if(obj < bestObj){
+          if((budget-nEval)>0){ # only update if it doesnt exceed budget
+            bestPop <- contextVector
+            bestObj <- obj
+          }
         }
       }
     }

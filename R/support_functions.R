@@ -76,6 +76,6 @@ subfunction <- function(population,contextVector,groupMember,mainfun,...){
   contextVector <- t(matrix(contextVector,nrow=nVar))
   contextVector[,groupMember] <- population
 
-   #print(mainfun)
+
   objectiveValue <- mainfun(contextVector,...)
 }

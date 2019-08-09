@@ -70,7 +70,8 @@ cc <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,grou
 
       nEval <- nEval + best$counts[1]
       print(c('best count',best$counts[1]))
-      newContextVector[groupMember] <- best$par
+      if(!is.null(best$par))
+        newContextVector[groupMember] <- best$par
     }
     print('Updating context vector')
     contextVector <- newContextVector

@@ -87,34 +87,38 @@ MOFBVE_surrogate <- function(contextVector=NULL,nVar,group=NULL,fun,phaseSolver=
       for(cmaesIter in 1:nCMAESiter){
         randomForestModel <- SPOT::buildRandomForest(pop,obj)
         best<- cmaes::cma_es(par=contextVector[groupMember],fn=modelPrediction,model=randomForestModel,upper= ubound[groupMember],lower= lbound[groupMember],control = list())
-        pop <- rbind(pop,best$par)
-        obj <- append(obj,subfunction(best$par,contextVector=contextVector,groupMember=groupMember,mainfun=fun,...))
+        if(!is.null(best$par)){
+          pop <- rbind(pop,best$par)
+          obj <- append(obj,subfunction(best$par,contextVector=contextVector,groupMember=groupMember,mainfun=fun,...))
+        }
       }
       rm(randomForestModel)
       nEval <- nEval + nCMAESiter
 
       print('updating context vector for interconnection step...')
       contextVector[groupMember] <- best$par
-      obj <- fun(contextVector,...)
+      this.obj <- fun(contextVector,...)
       nEval <- nEval + 1
-      if(obj < bestObj){
+      if(this.obj < bestObj){
         if((budget-nEval)>0){ # only update if it doesnt exceed budget
           bestPop <- contextVector
-          bestObj <- obj
+          bestObj <- this.obj
         }
       }
 
       # Interconnection
-      best <- cmaes::cma_es(par = contextVector,fn = fun,...,lower = lbound,upper=ubound,control = list(maxit=groupSize*5,mu=groupSize,lambda=groupSize))
+      best <- cmaes::cma_es(par = contextVector,fn = fun,...,lower = lbound,upper=ubound,control = list(maxit=100,mu=20,lambda=20))
       nEval <- nEval + best$counts[1]
       print('Interconnection step finished, updating context vector...')
-      contextVector <- best$par
-      obj <- fun(contextVector,...)
-      nEval <- nEval + 1
-      if(obj < bestObj){
-        if((budget-nEval)>0){ # only update if it doesnt exceed budget
-          bestPop <- contextVector
-          bestObj <- obj
+      if(!is.null(best$par)){
+        contextVector <- best$par
+        this.obj <- fun(contextVector,...)
+        nEval <- nEval + 1
+        if(this.obj < bestObj){
+          if((budget-nEval)>0){ # only update if it doesnt exceed budget
+            bestPop <- contextVector
+            bestObj <- this.obj
+          }
         }
       }
     }
