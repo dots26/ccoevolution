@@ -32,7 +32,7 @@ surrogate_grouping <- function(contextVector=NULL,nVar,group=NULL,fun,phaseSolve
   # }
 
   #if(is.null(group)){
-  r<- 2
+  r<- 20
   a <- sensitivity::morris(model=fun,
                            factor=nVar,
                            r = r,
@@ -43,7 +43,7 @@ surrogate_grouping <- function(contextVector=NULL,nVar,group=NULL,fun,phaseSolve
 
 
   bestPopIndex <- which.min(a$y)
-  bestPop <- a$x[bestPopIndex,]
+  bestPop <- a$X[bestPopIndex,]
   bestObj <- min(a$y)
 
   contextVector <- bestPop
@@ -70,16 +70,17 @@ surrogate_grouping <- function(contextVector=NULL,nVar,group=NULL,fun,phaseSolve
   print('Grouping...')
   new_group <- NULL
   for(i in 1:nLevel){
-    dg <- differential_grouping(length(group[i]),
+    gctrl <- list(lbound=lbound[group[[i]]],ubound=ubound[group[[i]]])
+    dg <- differential_grouping(length(group[[i]]),
                                 subfunction,
-                                grouping_control,
+                                control=gctrl,
                                 contextVector=contextVector,
-                                groupMember=group[i],
+                                groupMember=group[[i]],
                                 mainfun=fun,...)
     nEval <- nEval + dg$nEval
     newGroupLength <- length(dg$group)
     for(j in 1:newGroupLength){
-      new_group <- append(new_group,groupMember[dg$group[j]])
+      new_group <- append(new_group,list(group[[i]][dg$group[[j]]]))
     }
     print(c('nEval',nEval))
   }
