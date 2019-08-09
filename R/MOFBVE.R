@@ -34,7 +34,7 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,phaseSolver=cmaes,budg
   #  if(is.null(group)){
 
   print('sens')
-  r<- 2
+  r<- 20
   a <- sensitivity::morris(model=fun,
                            factor=nVar,
                            r = r,
@@ -43,8 +43,10 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,phaseSolver=cmaes,budg
                            bsup=ubound,
                            scale=F,...)
   bestPopIndex <- which.min(a$y)
-  bestPop <- a$x[bestPopIndex,]
+  bestPop <- a$X[bestPopIndex,]
   bestObj <- min(a$y)
+
+  contextVector <- bestPop
   nEval <- nEval + r*(nVar+1)
   mu.star <- apply(a$ee, 2, function(a) mean(abs(a)))
   sigma <- apply(a$ee, 2, sd)
