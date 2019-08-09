@@ -42,6 +42,7 @@ cc <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,grou
     dg <- differential_grouping(ncol(population),fun,grouping_control,...)
     nEval <- nEval + dg$nEval #510501
     group <- dg$group
+    print(c('nEval',nEval))
     save(group, file='group.Rdata')
   }
   # error checking on groups
@@ -68,6 +69,7 @@ cc <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,grou
                           control = list(mu = 50,lambda=50,maxit=1080))
 
       nEval <- nEval + best$counts[1]
+      print(c('best count',best$counts[1]))
       newContextVector[groupMember] <- best$par
     }
     print('Updating context vector')
@@ -81,8 +83,10 @@ cc <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,grou
         bestObj <- obj
       }
     }
+
     leftBudget <- budget - nEval
-    print(c('Comp budget left:',leftBudget))
+    print(c('Comp budget left:',leftBudget,budget,nEval))
+#    save(list=ls(),file=paste('datacc_',seed,'.Rdata',sep=''))
   }
   return(list(x=bestPop,y=bestObj))
 }
