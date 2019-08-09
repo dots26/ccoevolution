@@ -39,12 +39,10 @@ differential_grouping <- function(nVar,fun,control=list(),...){
 
   p1 <- con$lbound
   fun1 <- fun(p1,...)
-  nEval <- nEval + 1
 
   p2 <- t(matrix(rep(p1,length(ungrouped)),ncol=length(ungrouped)))
   fun_repeat <- fun(p2,...)
 
-  nEval <- nEval + length(ungrouped)
   groupID <- 1
   varGroup <- rep(0,length(ungrouped))
   for(i in 1:(length(ungrouped)-1)){
@@ -69,7 +67,6 @@ differential_grouping <- function(nVar,fun,control=list(),...){
       }
       a <- append(a,additional_member)
     }
-    nEval <- nEval + length(ungrouped)*(length(ungrouped)-1)
     this.group <- append(this.group,unlist(a))
 
     previouslyUngrouped <- (max(varGroup[this.group]) == 0 )
@@ -86,7 +83,7 @@ differential_grouping <- function(nVar,fun,control=list(),...){
     if(currentGroupLength>0)
       group <- append(group,list(which(varGroup==i)))
   }
-
+  nEval <- 1+(nVar*(nVar+1)/2)
   return(list(group=group,nEval = nEval))
 }
 
