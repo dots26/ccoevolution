@@ -18,49 +18,53 @@ MOFBVE_surrogate <- function(contextVector=NULL,nVar,group=NULL,fun,phaseSolver=
   doParallel::registerDoParallel()
   print(c('Ncores=',foreach::getDoParWorkers() ))
   nEval <- 0
-  if(is.null(contextVector)){
-    nEval <- nEval + 10000
-    population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
-    # Evaluate the whole population
-    print('Evaluating initial population...')
-    objectiveValue <- fun(population,...)
-    bestPopIndex <- which.min(objectiveValue)
-    bestPop <- population[bestPopIndex,]
-    bestObj <- min(objectiveValue)
-
-    contextVector <- bestPop
-  }
+  # if(is.null(contextVector)){
+  #   nEval <- nEval + 10000
+  #   population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
+  #   # Evaluate the whole population
+  #   print('Evaluating initial population...')
+  #   objectiveValue <- fun(population,...)
+  #   bestPopIndex <- which.min(objectiveValue)
+  #   bestPop <- population[bestPopIndex,]
+  #   bestObj <- min(objectiveValue)
+  #
+  #   contextVector <- bestPop
+  # }
 
   #if(is.null(group)){
-    r<- 2
-    a <- sensitivity::morris(model=fun,
-                             factor=nVar,
-                             r = r,
-                             design = list(type='oat',levels=8,grid.jump=1),
-                             binf=lbound,
-                             bsup=ubound,
-                             scale=F,...)
+  r<- 2
+  a <- sensitivity::morris(model=fun,
+                           factor=nVar,
+                           r = r,
+                           design = list(type='oat',levels=8,grid.jump=1),
+                           binf=lbound,
+                           bsup=ubound,
+                           scale=F,...)
 
-    nEval <- nEval + r*(nVar+1)
-    mu.star <- apply(a$ee, 2, function(a) mean(abs(a)))
-    sigma <- apply(a$ee, 2, sd)
+  bestPopIndex <- which.min(a$y)
+  bestPop <- a$x[bestPopIndex,]
+  bestObj <- min(a$y)
 
-    print('Using k-means...') # clustering
-    assignedGroup <- kmeans(cbind(mu.star,sigma),nLevel)$cluster
+  nEval <- nEval + r*(nVar+1)
+  mu.star <- apply(a$ee, 2, function(a) mean(abs(a)))
+  sigma <- apply(a$ee, 2, sd)
 
-    EF <- NULL
-    group <- NULL
-    sigmaMuAll <- sum(mu.star)
-    for(groupIndex in 1:nLevel){
-      sigmaMu <- sum(mu.star[which(assignedGroup==groupIndex)])
-      EF <- append(EF,sigmaMu/sigmaMuAll)
-      group <- append(group,list(which(assignedGroup==groupIndex)))
-    }
-    clusterOrder <- order(EF,decreasing = T)
-    save(group,file='MOFBVE_sur_group.Rdata')
-#  }else{
+  print('Using k-means...') # clustering
+  assignedGroup <- kmeans(cbind(mu.star,sigma),nLevel)$cluster
 
-#  }
+  EF <- NULL
+  group <- NULL
+  sigmaMuAll <- sum(mu.star)
+  for(groupIndex in 1:nLevel){
+    sigmaMu <- sum(mu.star[which(assignedGroup==groupIndex)])
+    EF <- append(EF,sigmaMu/sigmaMuAll)
+    group <- append(group,list(which(assignedGroup==groupIndex)))
+  }
+  clusterOrder <- order(EF,decreasing = T)
+  save(group,file='MOFBVE_sur_group.Rdata')
+  #  }else{
+
+  #  }
   print('Groups assigned')
   print(group[clusterOrder])
   # error checking on groups
@@ -114,7 +118,9 @@ MOFBVE_surrogate <- function(contextVector=NULL,nVar,group=NULL,fun,phaseSolver=
       }
     }
     leftBudget <- budget - nEval
-    print(c('Comp budget left:',leftBudget))
+    print(c('Comp budget left:',leftBudget,budget,nEval))
+    #save(list=ls(),file=paste('dataMOFBVE_sur_',seed,'.Rdata',sep=''))
+
   }
   return(list(x=bestPop,y=bestObj))
 }
