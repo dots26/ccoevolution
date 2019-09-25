@@ -18,13 +18,14 @@
 #' @export
 cc <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,group=NULL,grouping_control=list(),nCycle=9,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),...){
   doParallel::registerDoParallel()
-  print(c('Ncores=',foreach::getDoParWorkers() ))
+  convergence_history <- NULL
   nEval <- 0
+  mu_cma <- 10
   if(is.null(contextVector)){
-    nEval <- nEval + 10000      #10000
+    nEval <- nEval + 1000      #10000
     population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
     # Evaluate the whole population
-    print('Evaluating initial population...')
+    #print('Evaluating initial population...')
     objectiveValue <- fun(population,...)
     bestPopIndex <- which.min(objectiveValue)
     bestPop <- population[bestPopIndex,]
@@ -35,65 +36,136 @@ cc <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,grou
     bestPop <- contextVector
     bestObj <- fun(bestPop,...)
   }
+  convergence_history <- append(convergence_history,bestObj)
 
   # grouping
   if(is.null(group)){ # if no group is supplied, then the group is determined by differential grouping
-    print('Grouping...')
-    dg <- differential_grouping(ncol(population),fun,grouping_control,...)
-    nEval <- nEval + dg$nEval #510501
-    group <- dg$group
-    print(c('nEval',nEval))
-    save(group, file='group.Rdata')
+    #print('Grouping...')
+    dg <- DG2(length(bestPop),fun,grouping_control,...)
+    nEval <- nEval + 51501#dg$nEval #510501
+    group <- append(dg$group,list(dg$separable))
+
+    #save(group, file='group.Rdata')
   }
+  print(group)
   # error checking on groups
   if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
   if(!all(unlist(lapply(group,is.vector)))) stop('Sublist of group is of wrong mode, all of them should also be a vector')
 
-  nCycle <- 9
-
   newContextVector <- contextVector
-  for(cycleIndex in 1:nCycle){
-    print(c('Cycle Number:',cycleIndex))
-    # Optimize for each group
-    for(groupIndex in 1:length(group)){
-      groupSize <- length(group[groupIndex])
+  leftBudget <- budget - nEval
+  while(leftBudget>0){
+    leftBudget <- budget - nEval
+    #print(c('Comp budget left:',leftBudget,budget,nEval))
+   # save(list=ls(),file=paste('datacc_',seed,'.Rdata',sep=''))
+    # Optimize for each group (non-sep)
+    for(groupIndex in 1:(length(group)-1)) {
+      groupSize <- length(group[[groupIndex]])
       groupMember <- group[[groupIndex]]
 
       # generate population for current phase
-      best<-cmaes::cma_es(par = contextVector[groupMember],
-                          fn=subfunction,
+      best<-cma_es(par = contextVector[groupMember],
+                          fn=subfunctionCMA,
                           contextVector=contextVector,
                           groupMember = groupMember,mainfun=fun,...,
                           upper= ubound[groupMember],
                           lower= lbound[groupMember],
-                          control = list(mu = 50,lambda=50,maxit=1080))
-
+                          control = list(vectorized=T,
+                                         mu = mu_cma,
+                                         lambda=mu_cma,
+                                         maxit=3000,
+                                         sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
+                                         diag.value=T))
+      nlogging_this_layer <- floor((nEval+best$counts[1])/50000)-floor(nEval/50000)
+      if(nlogging_this_layer>0){
+        for(i in 1:nlogging_this_layer){
+          nEval_to_logging <- (50000*i) - nEval%%50000
+          nGeneration_to_consider <- floor(nEval_to_logging/mu_cma)
+          bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+          convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
+          print(c('conv',convergence_history))
+        }
+      }
       nEval <- nEval + best$counts[1]
-      print(c('best count',best$counts[1]))
+      #print(c('best count',best$counts[1]))
       if(!is.null(best$par))
         newContextVector[groupMember] <- best$par
-    }
-    print('Updating context vector')
-    contextVector <- newContextVector
-    obj <- fun(newContextVector,...)
-    nEval <- nEval + 1
 
-    if(obj < bestObj){
-      if((budget-nEval)>0){ # only update if it doesnt exceed budget
-        bestPop <- newContextVector
-        bestObj <- obj
+      leftBudget <- budget - nEval
+      print(c('Comp budget left:',leftBudget,budget,nEval))
+
+      if(best$value < bestObj){
+        if((budget-nEval)>0){
+          bestPop <- newContextVector
+          bestObj <- best$value
+          print('Update:')
+          print(bestObj)
+        }else{
+          break
+        }
       }
+     # save(list=ls(),file=paste('datacc_',seed,'.Rdata',sep=''))
     }
 
-    leftBudget <- budget - nEval
-    print(c('Comp budget left:',leftBudget,budget,nEval))
-#    save(list=ls(),file=paste('datacc_',seed,'.Rdata',sep=''))
+    # separable part
+    for(groupIndex in length(group)){
+      groupSize <- length(group[[groupIndex]])
+      groupMember <- group[[groupIndex]]
+      #groupMember <- groupIndex
+      # generate population for current phase
+      best<-sep_cma_es(par = contextVector[groupMember],
+                       fn=subfunctionCMA,
+                       contextVector=contextVector,
+                       groupMember = groupMember,mainfun=fun,...,
+                       upper= ubound[groupMember],
+                       lower= lbound[groupMember],
+                       control = list(vectorized=T,
+                                      mu = mu_cma,
+                                      lambda=mu_cma,
+                                      maxit=3000,
+                                      sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
+                                      diag.value=T))
+      nlogging_this_layer <- floor((nEval+best$counts[1])/50000)-floor(nEval/50000)
+      if(nlogging_this_layer>0){
+        for(i in 1:nlogging_this_layer){
+          nEval_to_logging <- (50000*i) - nEval%%50000
+          nGeneration_to_consider <- floor(nEval_to_logging/mu_cma)
+          bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+          convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
+          print(c('conv',convergence_history))
+        }
+      }
+      nEval <- nEval + best$counts[1]
+      #print(c('best count',best$counts[1]))
+      if(!is.null(best$par)){
+        newContextVector[groupMember] <- best$par
+      }
+
+      leftBudget <- budget - nEval
+      print(c('Comp budget left:',leftBudget,budget,nEval))
+
+      if(best$value < bestObj){
+        if((budget-nEval)>0){
+          bestPop <- newContextVector
+          bestObj <- best$value
+          print('Update:')
+          print(bestObj)
+        }else{
+          break
+        }
+      }
+    #  save(list=ls(),file=paste('datacc_',seed,'.Rdata',sep=''))
+    }
+
+    #print('Updating context vector')
+    contextVector <- newContextVector
   }
-  return(list(x=bestPop,y=bestObj))
+  return(list(x=bestPop,y=bestObj,conv=convergence_history))
 }
 
-
-
 modelPrediction <- function(newPoint,model){
-  predict(model,matrix(newPoint,nrow=1))$y
+  # transpose because cmaes ordering is not compatible with spot
+  if(is.matrix(newPoint))
+    a <- predict(model,t(newPoint))$y
+  return(a)
 }
