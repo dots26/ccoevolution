@@ -55,12 +55,9 @@ cc_ex <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,l
 
 
     print(c('Evaluating',activeVariable))
-    # grouping
     print('Grouping...')
 
     grouping_control <- list(ubound= ubound[activeVariable]/2,lbound= lbound[activeVariable],delta=(ubound[activeVariable]-lbound[activeVariable])*0.3)
-    # grouping is expensive when the variables are separable
-    # expended budget when separable = nVar * nVar-1 * 2
     grouping_result <- differential_grouping(nActive,fun=subfunction,grouping_control,contextVector=bestPop,groupMember=activeVariable,mainfun=fun,...)
     group <- grouping_result$group
     nEval <- nEval + grouping_result$nEval
@@ -69,13 +66,9 @@ cc_ex <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,l
     for(groupIndex in 1:length(group)) new_group <- append(new_group,list( activeVariable[group[[groupIndex]]]))
 
     group <- new_group
-
-    save(group,file='grouping.RData')
-    print(new_group)
     # error checking on groups
     if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
     if(!all(unlist(lapply(group,is.vector)))) stop('Sublist of group is of wrong mode, all of them should also be a vector')
-
 
     for(cycleIndex in 1:nCycle){
       print('starting new cycle:')
@@ -138,8 +131,6 @@ cc_ex <- function(contextVector=NULL,nVar,fun,phaseSolver=cmaes,budget=1000000,l
     # update the context vector for inactive variables
     contextVector[inactiveVar] <- population[bestPopIndex,]
     filename <- paste('remaining_inactive_is_',nInactive,'.Rdata',sep ='')
-   # save(list=ls(),file=filename)
-    #    bestObj <- min(objectiveValue)
   }
   return(list(x=bestPop,y=bestObj))
 }
