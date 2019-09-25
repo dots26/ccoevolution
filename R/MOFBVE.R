@@ -18,108 +18,176 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,phaseSolver=cmaes,budg
   doParallel::registerDoParallel()
   print(c('Ncores=',foreach::getDoParWorkers() ))
   nEval <- 0
-  # if(is.null(contextVector)){
-  #   nEval <- nEval + 10000
-  #   population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
-  #   # Evaluate the whole population
-  #   print('Evaluating initial population...')
-  #   objectiveValue <- fun(population,...)
-  #   bestPopIndex <- which.min(objectiveValue)
-  #   bestPop <- population[bestPopIndex,]
-  #   bestObj <- min(objectiveValue)
-  #
-  #   contextVector <- bestPop
-  # }
-
-  #  if(is.null(group)){
-
-  print('sens')
-  r<- 20
-  a <- sensitivity::morris(model=fun,
-                           factor=nVar,
-                           r = r,
-                           design = list(type='oat',levels=8,grid.jump=1),
-                           binf=lbound,
-                           bsup=ubound,
-                           scale=F,...)
-  bestPopIndex <- which.min(a$y)
-  bestPop <- a$X[bestPopIndex,]
-  bestObj <- min(a$y)
+  #if(is.null(contextVector)){
+  convergence_history <- NULL
+  nEval <- nEval + 1000
+  population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
+  # Evaluate the whole population
+  print('Evaluating initial population...')
+  objectiveValue <- fun(population,...)
+  bestPopIndex <- which.min(objectiveValue)
+  bestPop <- population[bestPopIndex,]
+  bestObj <- min(objectiveValue)
 
   contextVector <- bestPop
-  nEval <- nEval + r*(nVar+1)
-  mu.star <- apply(a$ee, 2, function(a) mean(abs(a)))
-  sigma <- apply(a$ee, 2, sd)
-
-  print('Using k-means...') # clustering
-  assignedGroup <- kmeans(cbind(mu.star,sigma),nLevel)$cluster
-
-  EF <- NULL
-  group <- NULL
-  sigmaMuAll <- sum(mu.star)
-  for(groupIndex in 1:nLevel){
-    sigmaMu <- sum(mu.star[which(assignedGroup==groupIndex)])
-    EF <- append(EF,sigmaMu/sigmaMuAll)
-    group <- append(group,list(which(assignedGroup==groupIndex)))
+  #}
+  print('sensitivity analysis with random forest')
+  a <- randomForest::randomForest(x=population,y=objectiveValue,importance=T)
+  impo_acc <- a$importance[,2]
+  impo_ranked <- order(impo_acc,decreasing = T)
+  if(is.null(group)){
+    interval <- floor(nVar/nLevel)
+    for(i in 0:(nLevel-2)){
+      start <- i*interval+1
+      end <- (i+1)*interval
+      group <- append(group,list(impo_ranked[start:end]))
+    }
+    group <- append(group,list(impo_ranked[((nLevel-1)*interval+1):nVar]))
   }
-  clusterOrder <- order(EF,decreasing = T)
-  save(group,file='MOFBVE_group.Rdata')
-  # }
-  print('Groups assigned')
-  # error checking on groups
+  convergence_history <- append(convergence_history,bestObj)
+
   if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
   if(!all(unlist(lapply(group,is.vector)))) stop('Sublist of group is of wrong mode, all of them should also be a vector')
   leftBudget <- budget - nEval
-  #saved
-  while((budget-nEval)>0 ){
-    for(groupIndex in clusterOrder[1:length(group)]) {
-      groupSize <- length(group[[groupIndex]])
-      groupMember <- group[[groupIndex]]
 
-      # group optimization
-      best<- cmaes::cma_es(contextVector[groupMember],
-                           fn = subfunction,
-                           contextVector = contextVector,
-                           groupMember = groupMember,mainfun=fun,...,
-                           lower = lbound[groupMember],
-                           upper=ubound[groupMember],
-                           control = list(mu=20,lambda=20,maxit=200))
-      nEval <- nEval + best$counts[1]
+  for(groupIndex in 1:(length(group)-1)) {
+    groupSize <- length(group[[groupIndex]])
+    groupMember <- group[[groupIndex]]
 
-      print('updating context vector for interconnection step...')
-      print(best$par)
+    print(c('optimizing group',groupIndex,'with',groupSize,'members'))
+    # group optimization
+    best<- cma_es(contextVector[groupMember],
+                  fn = subfunctionCMA,
+                  contextVector = contextVector,
+                  groupMember = groupMember,mainfun=fun,...,
+                  lower = lbound[groupMember],
+                  upper=ubound[groupMember],
+                  control = list(vectorized=T,
+                                 mu=10,lambda=10,
+                                 maxit=3000,
+                                 sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
+                                 diag.value=T))
+    nlogging_this_layer <- floor((nEval+best$counts[1])/50000)-floor(nEval/50000)
+    if(nlogging_this_layer>0){
+      for(i in 1:nlogging_this_layer){
+        nEval_to_logging <- (50000*i) - nEval%%50000
+        nGeneration_to_consider <- floor(nEval_to_logging/10)
+
+        bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+        convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
+        print(c('conv',convergence_history))
+      }
+    }
+    nEval <- nEval + best$counts[1]
+
+    print('updating context vector for interconnection step...')
+
+    if((budget-nEval)>0){ # only update if it doesnt exceed budget
       if(!is.null(best$par)){
         contextVector[groupMember] <- best$par
-        obj <- fun(contextVector,...)
-        nEval <- nEval + 1
+        obj <- best$value
         if(obj < bestObj){
-          if((budget-nEval)>0){ # only update if it doesnt exceed budget
-            bestPop <- contextVector
-            bestObj <- obj
-          }
+          bestPop <- contextVector
+          bestObj <- obj
+          print('Update:')
+          print(bestObj)
         }
+      }else{
+        print('is null')
       }
+    }else{
+      break
+    }
 
-      # Interconnection
-      best <- cmaes::cma_es(contextVector,fn = fun,...,lower = lbound,upper=ubound,control = list(mu=20,lambda=20,maxit=100))
-      nEval <- nEval + best$counts[1]
-      print('Interconnection step finished, updating context vector...')
-      print(best$par)
-      if(!is.null(besst$par)){
-        contextVector <- best$par
-        obj <- fun(contextVector,...)
-        nEval <- nEval + 1
-        if(obj < bestObj){
-          if((budget-nEval)>0){ # only update if it doesnt exceed budget
-            bestPop <- contextVector
-            bestObj <- obj
-          }
-        }
+    # Interconnection
+    best <- cma_es(contextVector,
+                   fn = subfunctionCMA,
+                   contextVector=contextVector,
+                   groupMember=1:nVar,
+                   mainfun=fun,
+                   ...,
+                   lower = lbound,
+                   upper=ubound,
+                   control = list(vectorized=T,mu=10,lambda=10,
+                                  maxit=300,
+                                  sigma=0.3*max(ubound-lbound),
+                                  diag.value=T))
+    nlogging_this_layer <- floor((nEval+best$counts[1])/50000)-floor(nEval/50000)
+    if(nlogging_this_layer>0){
+      for(i in 1:nlogging_this_layer){
+        nEval_to_logging <- (50000*i) - nEval%%50000
+        nGeneration_to_consider <- floor(nEval_to_logging/10)
+        bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+        convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
+        print(c('conv',convergence_history))
       }
+    }
+    nEval <- nEval + best$counts[1]
+    print('Interconnection step finished, updating context vector...')
+
+    if((budget-nEval)>0){ # only update if it doesnt exceed budget
+      if(!is.null(best$par)){
+        contextVector <- best$par
+        obj <- best$value
+        if(obj < bestObj){
+          bestPop <- contextVector
+          bestObj <- obj
+          print('Update:')
+          print(bestObj)
+        }
+      }else{
+        print('is null')
+      }
+    }else{
+      break
     }
     leftBudget <- budget - nEval
     print(c('Comp budget left:',leftBudget,budget,nEval))
-    #save(list=ls(),file=paste('dataMOFBVE_sur_',seed,'.Rdata',sep=''))
+    #save(list=ls(),file=paste('dataMOFBVE_',seed,'.Rdata',sep=''))
   }
-  return(list(x=bestPop,y=bestObj))
+
+  #final layer
+  print('final layer')
+
+  best <- cma_es(contextVector,
+                 fn = subfunctionCMA,
+                 contextVector=contextVector,
+                 groupMember=1:nVar,
+                 mainfun=fun,
+                 ...,
+                 lower = lbound,
+                 upper=ubound,
+                 control = list(vectorized=T,mu=10,lambda=10,
+                                maxit=(leftBudget/10)-1,
+                                sigma=0.3*max(ubound-lbound),diag.value=T) )
+  print(c('final layer convergence',best$convergence))
+  nlogging_this_layer <- floor((nEval+best$counts[1])/50000)-floor(nEval/50000)
+  print(nlogging_this_layer)
+  if(nlogging_this_layer>0){
+    for(i in 1:nlogging_this_layer){
+      nEval_to_logging <- 50000*i - nEval%%50000
+      nGeneration_to_consider <- floor(nEval_to_logging/10)
+      bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+      convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
+      print(c('conv',convergence_history))
+    }
+  }
+  nEval <- nEval + best$counts[1]
+  if(!is.null(best$par)){
+    contextVector <- best$par
+    obj <- best$value
+
+    if(obj < bestObj){
+      if((budget-nEval)>0){ # only update if it doesnt exceed budget
+        bestPop <- contextVector
+        bestObj <- obj
+        print('Update:')
+        print(bestObj)
+      }
+    }
+  }
+  leftBudget <- budget - nEval
+  print(c('Comp budget left:',leftBudget,budget,nEval))
+  #save(list=ls(),file=paste('dataMOFBVE_',seed,'.Rdata',sep=''))
+  return(list(x=bestPop,y=bestObj,conv=convergence_history))
 }
