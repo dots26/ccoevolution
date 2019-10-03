@@ -17,7 +17,7 @@ f10cec_s(x, o = NULL, rotation_matrix, permutation, weight)
 CEC 2013 f10 function.
 }
 \examples{
-x <- runif(1000)
-o <- double(1000)
+x <- runif(100)
+o <- double(100)
 f10cec_s(x,o)
 }

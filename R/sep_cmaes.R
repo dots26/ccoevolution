@@ -65,8 +65,8 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   cs          <- controlParam("cs", (mueff+2)/(N+mueff+3))
   mucov       <- controlParam("ccov.mu", mueff)
   ccov        <- controlParam("ccov.1",
-                              (1/mucov) * 2/(N+1.4)^2
-                              + (1-1/mucov) * min(1,((2*mucov-1)/((N+2)^2+mucov))))
+                              (N+2)/3*((1/mucov) * 2/(N+1.4)^2
+                              + (1-1/mucov) * min(1,((2*mucov-1)/((N+2)^2+mucov)))))
   damps       <- controlParam("damps",
                               1 + 2*max(0, sqrt((mueff-1)/(N+1))-1) + cs)
 

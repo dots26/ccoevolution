@@ -16,24 +16,25 @@ f4cec_s <- function(x,o=NULL,rotation_matrix,permutation,weight){ # rotated elli
     o <- double(ncol(x))
 
   res <- NULL
-  # group_size <- c(25,10,10,55)
+  group_size <- c(25,10,10,55)
   # rotation_matrix <- matrix(numeric(100*100),nrow=100)
   # set.seed(seed)
   # weight <- cec_weight(3)
   # weight <- append(weight,1)
-  # group <- NULL
-  # groupEnd <- 0
+  group <- NULL
+  groupEnd <- 0
   # permutation <- NULL
-  # for(i in 1:4){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
-  #   permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
-  #
+  for(i in 1:4){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
+    # permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
+    groupEnd <- groupEnd + group_size[i]
+  }
+
   # for(i in 1:3){
   #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
   # }
   # rotation_matrix[group[[4]],group[[4]]] <- diag(1,group_size[4])
+
   nPoint <- nrow(x)
   y <- x-t(matrix( rep(o,nrow(x) ),nrow=D) )
   y <- y[,permutation,drop=F]
@@ -73,18 +74,18 @@ f5cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ell
   res <- NULL
   group_size <- c(25,10,10,55)
   # rotation_matrix <- matrix(numeric(100*100),nrow=100)
-  # groupEnd <- 0
+  groupEnd <- 0
   #
   # set.seed(seed)
   # weight <- cec_weight(3)
-  # group <- NULL
+  group <- NULL
   # permutation <- NULL
   #
-  # for(i in 1:4){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
+  for(i in 1:4){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
   #   permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
+    groupEnd <- groupEnd + group_size[i]
+  }
   # for(i in 1:3){
   #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
   # }
@@ -128,19 +129,19 @@ f6cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ell
   res <- NULL
   group_size <- c(25,10,10,55)
   # rotation_matrix <- matrix(numeric(100*100),nrow=100)
-  # groupEnd <- 0
+  groupEnd <- 0
   #
   # set.seed(seed)
   # weight <- cec_weight(3)
   # #weight[1] <- 10000
-  # group <- NULL
+  group <- NULL
   # permutation <- NULL
   #
-  # for(i in 1:4){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
+  for(i in 1:4){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
   #   permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
+    groupEnd <- groupEnd + group_size[i]
+  }
   # for(i in 1:3){
   #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
   # }
@@ -184,18 +185,18 @@ f7cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated Sch
   res <- NULL
   group_size <- c(25,10,10,55)
   # rotation_matrix <- matrix(numeric(100*1000),nrow=100)
-  # groupEnd <- 0
+  groupEnd <- 0
   #
   # set.seed(seed)
   # weight <- cec_weight(3)
-  # group <- NULL
+  group <- NULL
   # permutation <- NULL
   #
-  # for(i in 1:4){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
+  for(i in 1:4){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
   #   permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
+    groupEnd <- groupEnd + group_size[i]
+  }
   # for(i in 1:3){
   #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
   # }
@@ -209,7 +210,6 @@ f7cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated Sch
   y <- t_asy(y,0.2)
   #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
 
-  print(y)
   group_sum <-numeric(nrow(x))
   for(i in 1:3){
     group_sum <- group_sum + weight[i]*f_schewefel_1_2(y[,group[[i]],drop=F])
@@ -243,15 +243,15 @@ f8cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ell
   # rotation_matrix <- matrix(numeric(100*100),nrow=100)
   # set.seed(seed)
   # weight <- cec_weight(nGroup)
-  # group <- NULL
-  # groupEnd <- 0
+  group <- NULL
+  groupEnd <- 0
   # permutation <- NULL
   #
-  # for(i in 1:nGroup){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
+  for(i in 1:nGroup){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
   #   permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
+    groupEnd <- groupEnd + group_size[i]
+  }
   # for(i in 1:nGroup){
   #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
   # }
@@ -291,18 +291,18 @@ f9cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ras
   group_size <- c(25,10,10,55)
   nGroup <- length(group_size)
   # rotation_matrix <- matrix(numeric(100*100),nrow=100)
-  # groupEnd <- 0
+  groupEnd <- 0
   #
   # set.seed(seed)
   # weight <- cec_weight(nGroup)
-  # group <- NULL
+  group <- NULL
   # permutation <- NULL
   #
-  # for(i in 1:nGroup){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
+  for(i in 1:nGroup){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
   #   permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
+    groupEnd <- groupEnd + group_size[i]
+  }
   # for(i in 1:nGroup){
   #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
   # }
@@ -332,8 +332,8 @@ f9cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ras
 #' @param o the optimum
 #' @param seed Seed for random permutation and rotation matrix
 #' @examples
-#' x <- runif(1000)
-#' o <- double(1000)
+#' x <- runif(100)
+#' o <- double(100)
 #' f10cec_s(x,o)
 #' @export
 f10cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ackley
@@ -345,18 +345,18 @@ f10cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ac
   group_size <- c(25,10,10,55)
   nGroup <- length(group_size)
   # rotation_matrix <- matrix(numeric(100*100),nrow=100)
-  # groupEnd <- 0
+  groupEnd <- 0
   #
   # set.seed(seed)
   # weight <- cec_weight(nGroup)
-  # group <- NULL
+  group <- NULL
   # permutation <- NULL
   #
-  # for(i in 1:nGroup){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
+  for(i in 1:nGroup){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
   #   permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
+    groupEnd <- groupEnd + group_size[i]
+  }
   # for(i in 1:nGroup){
   #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
   # }
@@ -398,18 +398,18 @@ f11cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated el
   group_size <- c(25,10,10,55)
   nGroup <- length(group_size)
   # rotation_matrix <- matrix(numeric(100*100),nrow=100)
-  # groupEnd <- 0
+  groupEnd <- 0
   #
   # set.seed(seed)
   # weight <- cec_weight(nGroup)
-  # group <- NULL
+  group <- NULL
   # permutation <- NULL
   #
-  # for(i in 1:nGroup){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
+  for(i in 1:nGroup){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
   #   permutation <- append(permutation,sample.int(group_size[i])+groupEnd)
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
+    groupEnd <- groupEnd + group_size[i]
+  }
   # for(i in 1:nGroup){
   #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
   # }
@@ -432,7 +432,7 @@ f11cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated el
 
 #' CEC 2013 f12 function.
 #'
-#' @title Shifted Rosenbrock function with 1000D variables. no separable variable
+#' @title Shifted Rosenbrock function with 100D variables. no separable variable
 #' @param x design variable
 #' @param o the optimum
 #' @param seed Seed for random permutation and rotation matrix
@@ -481,35 +481,21 @@ f13cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated el
   group_size <- c(25,10,10,55)
   nGroup <- length(group_size)
 
-  # rotation_matrix <- matrix(numeric(100*100),nrow=100)
-  #
-  # groupStart <- 1
-  # groupEnd <- 0
-  # m <- 2
-  #
-  # set.seed(seed)
-  # weight <- cec_weight(nGroup)
-  # group <- NULL
-  # permutation <- NULL
-  #
-  # for(i in 1:nGroup){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
-  #   permutation <- append(permutation,sample.int(group_size[i])+groupStart-1)
-  #   groupStart <- groupStart + group_size[i] - m
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
-  # for(i in 1:nGroup){
-  #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
-  # }
+  groupEnd <- 0
+  group <- NULL
+
+  for(i in 1:nGroup){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
+    groupStart <- groupStart + group_size[i] - m
+    groupEnd <- groupEnd + group_size[i]
+  }
 
   y <- x-t(matrix( rep(o,nrow(x) ),nrow=D) )
-
   y <- y[,permutation,drop=F]
-
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
   y <- t_asy(y,0.2)
-  #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
+
   group_sum <-numeric(nrow(x))
   for(i in 1:nGroup){
     group_sum <- group_sum + weight[i]*f_schewefel_1_2(y[,group[[i]]])
@@ -537,34 +523,20 @@ f14cec_s <- function(x,o=NULL, rotation_matrix,permutation,weight){
   res <- NULL
   group_size <- c(25,10,10,55)
   nGroup <- length(group_size)
-  # rotation_matrix <- matrix(numeric(100*100),nrow=100)
-  # groupStart <- 1
-  # groupEnd <- 0
-  # m <- 5
-  #
-  # set.seed(seed)
-  # weight <- cec_weight(nGroup)
-  # group <- NULL
-  # permutation <- NULL
-  #
-  # for(i in 1:nGroup){
-  #   group <- append(group,list(groupEnd+(1:group_size[i])))
-  #   permutation <- append(permutation,sample.int(group_size[i])+groupStart-1)
-  #   groupStart <- groupStart + group_size[i] - m
-  #   groupEnd <- groupEnd + group_size[i]
-  # }
-  #
-  # for(i in 1:nGroup){
-  #   rotation_matrix[group[[i]],group[[i]]] <- soobench:::random_rotation_matrix(group_size[i])
-  # }
+  groupEnd <- 0
+  group <- NULL
+
+  for(i in 1:nGroup){
+    group <- append(group,list(groupEnd+(1:group_size[i])))
+    groupStart <- groupStart + group_size[i] - m
+    groupEnd <- groupEnd + group_size[i]
+  }
 
   y <- x-t(matrix( rep(o,nrow(x) ),nrow=D) )
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
   y <- t_asy(y,0.2)
-
-  #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
 
   group_sum <-numeric(nrow(x))
   for(i in 1:nGroup){

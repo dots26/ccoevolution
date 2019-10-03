@@ -3,6 +3,7 @@
 #' @title Cooperative coevolution.
 #' @param population Initial population
 #' @param fun The objective function object to be solved
+#' @param phaseSolver Optimizer/solver for phase-optimization step.
 #' @param group Vector of list. Each list contains a group of non-separable variables. Available method: \code{differential_grouping}.
 #' @param grouping_control Grouping parameters. The members depends on which grouping being used.
 #' @param nCycle Number of cycles to be run.
@@ -13,18 +14,18 @@
 #' func <- f1cec
 #' ctrl <- list(lbound=rep(-100,100),ubound=rep(100,100),delta=rep(100,100))
 #' group <- differential_grouping(ncol(population),func,ctrl,o=optimum)
-#' cc(nVar = 100,fun=func,group=group,nCycle = 2,o=optimum,lbound=rep(-100,100),ubound=rep(100,100))
+#' cc_2(nVar = 100,fun=func,phaseSolver = cmaes,group=group,nCycle = 2,o=optimum,lbound=rep(-100,100),ubound=rep(100,100))
 #' @export
-cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_control=list(),nCycle=9,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),evalInterval=100000,...){
+cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_control=list(),nCycle=9,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),evalInterval=100000,...){
   doParallel::registerDoParallel()
+
   convergence_history <- NULL
   nEval <- 0
-  muCMA <- 20
+  mu_cma <- 20
   if(is.null(contextVector)){
     nEval <- nEval + 1000      #10000
     population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
-    # Evaluate the whole population
-    ## print('Evaluating initial population...')
+
     objectiveValue <- fun(population,...)
     bestPopIndex <- which.min(objectiveValue)
     bestPop <- population[bestPopIndex,]
@@ -42,11 +43,10 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
     ## print('Grouping...')
     dg <- DG2(length(bestPop),fun,grouping_control,...)
     nEval <- nEval + dg$nEval
-    #if(length(dg$separable)>0)
-    #  group <- append(dg$group,list(dg$separable))
-    #else
-    group <- dg$group
-
+    if(length(dg$separable)>0)
+      group <- append(dg$group,list(dg$separable))
+    else
+      group <- dg$group
     #save(group, file='group.Rdata')
   }
   # error checking on groups
@@ -72,8 +72,8 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
                    upper= ubound[groupMember],
                    lower= lbound[groupMember],
                    control = list(vectorized=T,
-                                  mu = muCMA,
-                                  lambda=muCMA,
+                                  mu = mu_cma,
+                                  lambda=mu_cma,
                                   maxit=2500,
                                   sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                   diag.value=T))
@@ -81,7 +81,7 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+          nGeneration_to_consider <- floor(nEval_to_logging/mu_cma)
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
           # print(c('conv',convergence_history))
@@ -107,55 +107,6 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
       }
       # save(list=ls(),file=paste('datacc_',seed,'.Rdata',sep=''))
     }
-
-    # separable part
-    groupSize <- length(dg$sep)
-    groupMember <- dg$sep
-    if(groupSize>0){
-      best<-sep_cma_es(par = contextVector[groupMember],
-                       fn=subfunctionCMA,
-                       contextVector=contextVector,
-                       groupMember = groupMember,mainfun=fun,...,
-                       upper= ubound[groupMember],
-                       lower= lbound[groupMember],
-                       control = list(vectorized=T,
-                                      mu = muCMA,
-                                      lambda=muCMA,
-                                      maxit=2500,
-                                      sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
-                                      diag.value=T))
-      nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
-      if(nlogging_this_layer>0){
-        for(i in 1:nlogging_this_layer){
-          nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
-          bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
-          convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
-          # print(c('conv',convergence_history))
-        }
-      }
-      nEval <- nEval + best$counts[1]
-      ## print(c('best count',best$counts[1]))
-      if(!is.null(best$par)){
-        newContextVector[groupMember] <- best$par
-      }
-
-      leftBudget <- budget - nEval
-      print(c('Comp budget left:',leftBudget,budget,nEval))
-
-      if(best$value < bestObj){
-        if((budget-nEval)>0){
-          bestPop <- newContextVector
-          bestObj <- best$value
-          # print('Update:')
-          # print(bestObj)
-        }else{
-          break
-        }
-      }
-    }
-    #  save(list=ls(),file=paste('datacc_',seed,'.Rdata',sep=''))
-    #}
 
     ## print('Updating context vector')
     contextVector <- newContextVector

@@ -2,7 +2,7 @@
 % Please edit documentation in R/test_problem_scaled_down.R
 \name{f12cec_s}
 \alias{f12cec_s}
-\title{Shifted Rosenbrock function with 1000D variables. no separable variable}
+\title{Shifted Rosenbrock function with 100D variables. no separable variable}
 \usage{
 f12cec_s(x, o = NULL)
 }
