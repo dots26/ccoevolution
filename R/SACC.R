@@ -15,7 +15,7 @@
 #' @export
 SACC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),nLevel=4,evalInterval=100000,...){
   doParallel::registerDoParallel()
-  muCMA <- 20
+  #groupSize <- 20
   # print(c('Ncores=',foreach::getDoParWorkers() ))
   nEval <- 0
   convergence_history <- NULL
@@ -54,6 +54,7 @@ SACC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
     }
     group <- append(group,list(impo_ranked[((nLevel-1)*interval+1):nVar]))
   }
+  print(group)
   # error checking on groups
   if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
   if(!all(unlist(lapply(group,is.vector)))) stop('Sublist of group is of wrong mode, all of them should also be a vector')
@@ -65,7 +66,7 @@ SACC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
       groupSize <- length(group[[groupIndex]])
       groupMember <- group[[groupIndex]]
 
-      # print(c('optimizing group',groupIndex,'with',groupSize,'members'))
+      print(c('optimizing group',groupIndex,'with',groupSize,'members'))
       # group optimization
       best<- cma_es(contextVector[groupMember],
                     fn = subfunctionCMA,
@@ -74,22 +75,22 @@ SACC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
                     lower = lbound[groupMember],
                     upper=ubound[groupMember],
                     control = list(vectorized=T,
-                                   mu=muCMA,lambda=muCMA,
-                                   maxit=2500,
+                                   mu=groupSize,lambda=groupSize,
+                                   maxit=900,
                                    sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                    diag.value=T))
       nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+          nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
           # print(convergence_history)
         }
       }
       nEval <- nEval + best$counts[1]
-      # print('updating context vector for interconnection step...')
+      print('updating context vector for interconnection step...')
       if((budget-nEval)>0){ # only update if it doesnt exceed budget
         if(!is.null(best$par)){
           contextVector[groupMember] <- best$par
@@ -113,15 +114,15 @@ SACC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
                      ...,
                      lower = lbound,
                      upper=ubound,
-                     control = list(vectorized=T,mu=muCMA,lambda=muCMA,
-                                    maxit=250,
+                     control = list(vectorized=T,mu=groupSize,lambda=groupSize,
+                                    maxit=90,
                                     sigma=0.3*max(ubound-lbound),
                                     diag.value=T))
       nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+          nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
           # print(convergence_history)
@@ -129,7 +130,7 @@ SACC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
       }
       nEval <- nEval + best$counts[1]
 
-      # print('Interconnection step finished, updating context vector...')
+      print('Interconnection step finished, updating context vector...')
       if((budget-nEval)>0){ # only update if it doesnt exceed budget
         if(!is.null(best$par)){
           contextVector <- best$par

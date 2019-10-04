@@ -1,7 +1,7 @@
-Package: ccoevolution
+Package: ccoevolution2
 Type: Package
 Title: Cooperative Coevolution (CC) for large scale optimization
-Version: 0.6.1
+Version: 0.6.01
 Author: Dani Irawan
 Maintainer: Dani Irawan <irawan_dani@yahoo.com>
 Description: 

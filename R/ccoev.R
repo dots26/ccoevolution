@@ -19,7 +19,7 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
   doParallel::registerDoParallel()
   convergence_history <- NULL
   nEval <- 0
-  muCMA <- 20
+  #groupSize <- 20
   if(is.null(contextVector)){
     nEval <- nEval + 1000      #10000
     population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
@@ -35,6 +35,7 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
     bestPop <- contextVector
     bestObj <- fun(bestPop,...)
   }
+  print(group)
   convergence_history <- append(convergence_history,bestObj)
 
   # grouping
@@ -72,16 +73,16 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
                    upper= ubound[groupMember],
                    lower= lbound[groupMember],
                    control = list(vectorized=T,
-                                  mu = muCMA,
-                                  lambda=muCMA,
-                                  maxit=2500,
+                                  mu = groupSize,
+                                  lambda=groupSize,
+                                  maxit=900,
                                   sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                   diag.value=T))
       nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+          nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
           # print(c('conv',convergence_history))
@@ -119,16 +120,16 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
                        upper= ubound[groupMember],
                        lower= lbound[groupMember],
                        control = list(vectorized=T,
-                                      mu = muCMA,
-                                      lambda=muCMA,
-                                      maxit=2500,
+                                      mu = groupSize,
+                                      lambda=groupSize,
+                                      maxit=900,
                                       sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                       diag.value=T))
       nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+          nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
           # print(c('conv',convergence_history))

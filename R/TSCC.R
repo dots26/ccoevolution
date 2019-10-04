@@ -16,7 +16,7 @@
 TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),nLevel=4,evalInterval=100000,...){
   doParallel::registerDoParallel()
   # print(c('Ncores=',foreach::getDoParWorkers() ))
-  muCMA <- 20
+  #groupSize <- 20
   nEval <- 0
   convergence_history <- NULL
   # print('sens')
@@ -32,6 +32,7 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
   contextVector <- bestPop
 
   a <- randomForest::randomForest(x=population,y=objectiveValue,importance=T)
+
   impo_acc <- a$importance[,1]
   impo_ranked <- order(impo_acc,decreasing = T)
 
@@ -57,6 +58,7 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
                     groupMember=group[[i]],
                     mainfun=fun,...)
     dg <- cbind(dg,subgroup)
+    print(subgroup)
     nEval <- nEval + dg[,i]$nEval
   }
 
@@ -87,22 +89,22 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
                       lower = lbound[groupMember],
                       upper=ubound[groupMember],
                       control = list(vectorized=T,
-                                     mu=muCMA,lambda=muCMA,
-                                     maxit=2500,
+                                     mu=groupSize,lambda=groupSize,
+                                     maxit=900,
                                      sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                      diag.value=T))
         nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
             nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-            nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+            nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
             bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
             convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
             # print(convergence_history)
           }
         }
         nEval <- nEval + best$counts[1]
-        ## print('updating context vector for interconnection step...')
+        print('Interconnection step...')
         if((budget-nEval)>0){ # only update if it doesnt exceed budget
           if(!is.null(best$par)){
             contextVector[groupMember] <- best$par
@@ -127,15 +129,15 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
                        ...,
                        lower = lbound,
                        upper=ubound,
-                       control = list(vectorized=T,mu=muCMA,lambda=muCMA,
-                                      maxit=250,
+                       control = list(vectorized=T,mu=groupSize,lambda=groupSize,
+                                      maxit=90,
                                       sigma=0.3*max(ubound-lbound),
                                       diag.value=T))
         nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
             nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-            nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+            nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
             bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
             convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
             # print(convergence_history)
@@ -143,7 +145,7 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
         }
         nEval <- nEval + best$counts[1]
 
-        # print('Interconnection step finished, updating context vector...')
+        print('Interconnection step finished, updating context vector...')
         if((budget-nEval)>0){ # only update if it doesnt exceed budget
           if(!is.null(best$par)){
             contextVector <- best$par
@@ -161,6 +163,7 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
       }
 
       # optimize non-separable
+      print('Optimize current group non-seps...')
       if(length(currentClusterGrouping)>0){
         for(groupIndex in 1:length(currentClusterGrouping)) {
           groupMember <- this.cluster[currentClusterGrouping[[groupIndex]]]
@@ -173,16 +176,16 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
                         mainfun=fun,...,
                         lower = lbound[groupMember],
                         upper=ubound[groupMember],
-                        # control = list(mu=muCMA,lambda=muCMA,maxit=2000))
-                        control = list(mu=muCMA,lambda=muCMA,
-                                       maxit=2500,
+                        # control = list(mu=groupSize,lambda=groupSize,maxit=2000))
+                        control = list(mu=groupSize,lambda=groupSize,
+                                       maxit=900,
                                        sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                        diag.value=T))
           nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
           if(nlogging_this_layer>0){
             for(i in 1:nlogging_this_layer){
               nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-              nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+              nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
               bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
               convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
               # print(convergence_history)
@@ -190,7 +193,7 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
           }
           nEval <- nEval + best$counts[1]
 
-          # print('updating context vector (non-separable) for interconnection step...')
+          print('updating context vector (non-separable) for interconnection step...')
           if((budget-nEval)>0){ # only update if it doesnt exceed budget
             if(!is.null(best$par)){
               contextVector[groupMember] <- best$par
@@ -218,15 +221,15 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
                        upper=ubound,
                        # control = list(vectorized=T,maxit=1000,mu=20,lambda=20))
                        control = list(vectorized=T,
-                                      maxit=250,
-                                      mu=muCMA,lambda=muCMA,
+                                      maxit=90,
+                                      mu=groupSize,lambda=groupSize,
                                       sigma=0.3*max(ubound-lbound),
                                       diag.value=T))
         nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
             nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-            nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+            nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
             bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
             convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
             # print(convergence_history)

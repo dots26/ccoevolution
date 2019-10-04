@@ -17,7 +17,7 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=
   doParallel::registerDoParallel()
   # print(c('Ncores=',foreach::getDoParWorkers() ))
   nEval <- 0
-  muCMA <- 20
+  #groupSize <- 20
   #if(is.null(contextVector)){
   convergence_history <- NULL
   nEval <- nEval + 10000
@@ -44,6 +44,7 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=
     }
     group <- append(group,list(impo_ranked[((nLevel-1)*interval+1):nVar]))
   }
+  print(group)
   convergence_history <- append(convergence_history,bestObj)
 
   if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
@@ -63,15 +64,15 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=
                   lower = lbound[groupMember],
                   upper=ubound[groupMember],
                   control = list(vectorized=T,
-                                 mu=muCMA,lambda=muCMA,
-                                 maxit=2500,
+                                 mu=groupSize,lambda=groupSize,
+                                 maxit=900,
                                  sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                  diag.value=T))
     nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
     if(nlogging_this_layer>0){
       for(i in 1:nlogging_this_layer){
         nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-        nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+        nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
 
         bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
         convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
@@ -108,15 +109,15 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=
                    ...,
                    lower = lbound,
                    upper=ubound,
-                   control = list(vectorized=T,mu=muCMA,lambda=muCMA,
-                                  maxit=250,
+                   control = list(vectorized=T,mu=groupSize,lambda=groupSize,
+                                  maxit=90,
                                   sigma=0.3*max(ubound-lbound),
                                   diag.value=T))
     nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
     if(nlogging_this_layer>0){
       for(i in 1:nlogging_this_layer){
         nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-        nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+        nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
         bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
         convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
         # print(c('conv',convergence_history))
@@ -157,7 +158,7 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=
                  ...,
                  lower = lbound,
                  upper=ubound,
-                 control = list(vectorized=T,mu=muCMA,lambda=muCMA,
+                 control = list(vectorized=T,mu=groupSize,lambda=groupSize,
                                 maxit=(leftBudget/10)-1,
                                 sigma=0.3*max(ubound-lbound),diag.value=T) )
   # print(c('final layer convergence',best$convergence))
@@ -166,7 +167,7 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=
   if(nlogging_this_layer>0){
     for(i in 1:nlogging_this_layer){
       nEval_to_logging <- evalInterval*i - nEval%%evalInterval
-      nGeneration_to_consider <- floor(nEval_to_logging/muCMA)
+      nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
       bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
       convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
       # print(c('conv',convergence_history))

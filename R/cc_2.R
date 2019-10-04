@@ -21,7 +21,7 @@ cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_
 
   convergence_history <- NULL
   nEval <- 0
-  mu_cma <- 20
+  #groupSize <- 20
   if(is.null(contextVector)){
     nEval <- nEval + 1000      #10000
     population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
@@ -49,6 +49,7 @@ cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_
       group <- dg$group
     #save(group, file='group.Rdata')
   }
+  print(group)
   # error checking on groups
   if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
   if(!all(unlist(lapply(group,is.vector)))) stop('Sublist of group is of wrong mode, all of them should also be a vector')
@@ -72,16 +73,16 @@ cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_
                    upper= ubound[groupMember],
                    lower= lbound[groupMember],
                    control = list(vectorized=T,
-                                  mu = mu_cma,
-                                  lambda=mu_cma,
-                                  maxit=2500,
+                                  mu = groupSize,
+                                  lambda=groupSize,
+                                  maxit=900,
                                   sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                   diag.value=T))
       nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/mu_cma)
+          nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
           # print(c('conv',convergence_history))
