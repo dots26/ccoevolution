@@ -5,7 +5,8 @@
 \title{Cooperative coevolution.}
 \usage{
 TSCC(contextVector = NULL, nVar, fun, group = NULL, budget = 1e+06,
-  lbound = rep(-Inf, nVar), ubound = rep(Inf, nVar), nLevel = 4, ...)
+  lbound = rep(-Inf, nVar), ubound = rep(Inf, nVar), nLevel = 4,
+  evalInterval = 1e+05, ...)
 }
 \arguments{
 \item{fun}{The objective function object to be solved}
