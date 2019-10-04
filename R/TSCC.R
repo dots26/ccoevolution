@@ -30,23 +30,38 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
   bestObj <- min(objectiveValue)
 
   contextVector <- bestPop
-
-  a <- randomForest::randomForest(x=population,y=objectiveValue,importance=T)
-
-  impo_acc <- a$importance[,1]
-  impo_ranked <- order(impo_acc,decreasing = T)
-
+  prevLevel <- NULL
+  #group <- NULL
   if(is.null(group)){
-    interval <- floor(nVar/nLevel)
-    for(i in 0:(nLevel-2)){
-      start <- i*interval+1
-      end <- (i+1)*interval
-      group <- append(group,list(impo_ranked[start:end]))
+    for(groupingIndex in 1:(nLevel-1)){
+      nLevelVar <- floor(nVar/nLevel)
+      print(paste0('Throwing LASSO...#',groupingIndex)) # regularization
+      predictlasso<-glmnet::glmnet((population), objectiveValue)
+      stopIndex <- max(which(predictlasso$df<nLevelVar*groupingIndex))
+      stopLambda <- predictlasso$lambda[stopIndex]
+      indices <- coef(predictlasso,s=stopLambda)
+      indices <- as.matrix(indices)
+      activeVariable <- indices[-1]
+      activeVariable <- which(activeVariable!=0)
+      activeVariable <- (setdiff(activeVariable,prevLevel))
+      prevLevel <- unique(c(prevLevel,activeVariable))
+      group <- append(group,list(activeVariable))
     }
-    group <- append(group,list(impo_ranked[((nLevel-1)*interval+1):nVar]))
+    lastGroup <- setdiff(1:nVar,prevLevel)
+    group <- append(group,list(lastGroup))
   }
 
-  # print('Secondary Grouping...')
+  # if(is.null(group)){
+  #   interval <- floor(nVar/nLevel)
+  #   for(i in 0:(nLevel-2)){
+  #     start <- i*interval+1
+  #     end <- (i+1)*interval
+  #     group <- append(group,list(impo_ranked[start:end]))
+  #   }
+  #   group <- append(group,list(impo_ranked[((nLevel-1)*interval+1):nVar]))
+  # }
+
+  print('Secondary Grouping...')
   new_group <- NULL
   dg <- NULL
   for(i in 1:nLevel){
@@ -80,19 +95,19 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
       groupSize <- length(groupMember)
 
       if(groupSize>0){
-       # # print(c('optimizing separable variables'))
+        # # print(c('optimizing separable variables'))
         # group optimization
         best<- sep_cma_es(contextVector[groupMember],
-                      fn = subfunctionCMA,
-                      contextVector = contextVector,
-                      groupMember = groupMember,mainfun=fun,...,
-                      lower = lbound[groupMember],
-                      upper=ubound[groupMember],
-                      control = list(vectorized=T,
-                                     mu=groupSize,lambda=groupSize,
-                                     maxit=900,
-                                     sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
-                                     diag.value=T))
+                          fn = subfunctionCMA,
+                          contextVector = contextVector,
+                          groupMember = groupMember,mainfun=fun,...,
+                          lower = lbound[groupMember],
+                          upper=ubound[groupMember],
+                          control = list(vectorized=T,
+                                         mu=groupSize,lambda=groupSize,
+                                         maxit=900,
+                                         sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
+                                         diag.value=T))
         nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
@@ -205,7 +220,7 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
                 # print(bestObj)
               }
             }else{
-        #      # print('is null')
+              #      # print('is null')
             }
           }else{
             break
@@ -250,7 +265,7 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
               # print(bestObj)
             }
           }else{
-        #    # print('is null')
+            #    # print('is null')
           }
         }else{
           break
@@ -258,7 +273,7 @@ TSCC <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=re
       }
       leftBudget <- budget - nEval
       print(c('Comp budget left:',leftBudget,budget,nEval))
-    #  save(list=ls(),file=paste('dataTSCC_',seed,'.Rdata',sep=''))
+      #  save(list=ls(),file=paste('dataTSCC_',seed,'.Rdata',sep=''))
     }
   }
   return(list(x=bestPop,y=bestObj,conv=convergence_history))

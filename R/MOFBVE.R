@@ -32,17 +32,25 @@ MOFBVE <- function(contextVector=NULL,nVar,fun,group=NULL,budget=1000000,lbound=
   contextVector <- bestPop
   #}
   # print('sensitivity analysis with random forest')
-  a <- randomForest::randomForest(x=population,y=objectiveValue,importance=T)
-  impo_acc <- a$importance[,2]
-  impo_ranked <- order(impo_acc,decreasing = T)
+  prevLevel <- NULL
+  #group <- NULL
   if(is.null(group)){
-    interval <- floor(nVar/nLevel)
-    for(i in 0:(nLevel-2)){
-      start <- i*interval+1
-      end <- (i+1)*interval
-      group <- append(group,list(impo_ranked[start:end]))
+    for(groupingIndex in 1:(nLevel-1)){
+      nLevelVar <- floor(nVar/nLevel)
+      print(paste0('Throwing LASSO...#',groupingIndex)) # regularization
+      predictlasso<-glmnet::glmnet((population), objectiveValue)
+      stopIndex <- max(which(predictlasso$df<nLevelVar*groupingIndex))
+      stopLambda <- predictlasso$lambda[stopIndex]
+      indices <- coef(predictlasso,s=stopLambda)
+      indices <- as.matrix(indices)
+      activeVariable <- indices[-1]
+      activeVariable <- which(activeVariable!=0)
+      activeVariable <- (setdiff(activeVariable,prevLevel))
+      prevLevel <- unique(c(prevLevel,activeVariable))
+      group <- append(group,list(activeVariable))
     }
-    group <- append(group,list(impo_ranked[((nLevel-1)*interval+1):nVar]))
+    lastGroup <- setdiff(1:nVar,prevLevel)
+    group <- append(group,list(lastGroup))
   }
   print(group)
   convergence_history <- append(convergence_history,bestObj)
