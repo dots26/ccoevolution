@@ -34,13 +34,16 @@ f_schewefel_1_2 <- function(x){
   D <- ncol(x)
 
   summand <- numeric(nrow(x))
+  prevSum <- summand
   if(nrow(x)>1){
     for(i in 1:D){
-      summand <- summand + ( rowSums(x[,1:i,drop=F])*rowSums(x[,1:i,drop=F]))
+      prevSum <- prevSum + x[,i]
+      summand <- summand + ( prevSum* prevSum)
     }
   }else{
     for(i in 1:D){
-      summand <- summand + ( sum(x[,1:i])*sum(x[,1:i]))
+      prevSum <- prevSum + x[,i]
+      summand <- summand + (  prevSum* prevSum)
     }
   }
   return(summand)
