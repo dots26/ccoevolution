@@ -23,7 +23,7 @@ TSCC(contextVector = NULL, nVar, fun, ..., group = NULL,
 \item{nCycle}{Number of cycles to be run.}
 }
 \description{
-Main function for the cooperative coevolution MOFBVE with multilevel framework
+Two stage cooperative coevolution with CMA-ES
 }
 \examples{
 optimum <- rep(13,1000)
