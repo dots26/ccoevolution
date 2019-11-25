@@ -4,16 +4,17 @@
 \alias{TSCC}
 \title{Cooperative coevolution.}
 \usage{
-TSCC(contextVector = NULL, nVar, fun, group = NULL, budget = 1e+06,
-  lbound = rep(-Inf, nVar), ubound = rep(Inf, nVar), nLevel = 4,
-  evalInterval = 1e+05, ...)
+TSCC(contextVector = NULL, nVar, fun, ..., group = NULL,
+  budget = 3e+06, lbound = rep(-Inf, nVar), ubound = rep(Inf, nVar),
+  nLevel = 4, evalInterval = 1e+05, SA_method = c("morris_mu",
+  "morris_k", "rf", "sobol"), keepCovariance = F)
 }
 \arguments{
 \item{fun}{The objective function object to be solved}
 
-\item{group}{Vector of list. Each list contains a group of non-separable variables. Available method: \code{differential_grouping}.}
-
 \item{...}{Further arguments passed to \code{fun}.}
+
+\item{group}{Vector of list. Each list contains a group of non-separable variables. Available method: \code{differential_grouping}.}
 
 \item{population}{Initial population}
 

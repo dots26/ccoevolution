@@ -1,3 +1,17 @@
+f_sphere <- function(x){
+  if(is.vector(x))
+    x <- matrix(x,ncol=length(x))
+
+  D <- ncol(x)
+  i <- 1:D
+  if(nrow(x)>1){
+    res <- t(matrix(rep(1,D),nrow=1)%*%t(x*x))
+  }else{
+    res <- sum(x*x)
+  }
+  return(res)
+}
+
 f_elliptic <- function(x){
   if(is.vector(x))
     x <- matrix(x,ncol=length(x))
@@ -7,7 +21,7 @@ f_elliptic <- function(x){
   conditioning <- matrix(10^(6*(i-1)/(D-1)),nrow=1)
 
   if(nrow(x)>1){
-    res <- (conditioning%*%t(x*x))
+    res <- t(conditioning%*%t(x*x))
   }else{
     res <- sum(conditioning*x*x)
   }
@@ -35,17 +49,12 @@ f_schewefel_1_2 <- function(x){
 
   summand <- numeric(nrow(x))
   prevSum <- summand
-  if(nrow(x)>1){
-    for(i in 1:D){
-      prevSum <- prevSum + x[,i]
-      summand <- summand + ( prevSum* prevSum)
-    }
-  }else{
-    for(i in 1:D){
-      prevSum <- prevSum + x[,i]
-      summand <- summand + (  prevSum* prevSum)
-    }
+
+  for(i in 1:D){
+    prevSum <- prevSum + x[,i,drop=F]
+    summand <- summand + ( prevSum* prevSum)
   }
+
   return(summand)
 }
 
@@ -54,6 +63,7 @@ t_osz <- function(x){
 
   xlog[which(is.nan(xlog))] <- 0
 
+  #print(xlog)
   c1 <- 10*as.integer(x>0) +  5.5*as.integer(x<=0)
   c2 <- 7.9*as.integer(x>0) +  3.1*as.integer(x<=0)
 

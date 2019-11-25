@@ -61,3 +61,10 @@ tfun <- function(x,mainfun,...){
   res <- mainfun(x,...)
   return(t(res))
 }
+
+modelPrediction <- function(newPoint,model){
+  # transpose because cmaes ordering is not compatible with spot
+  if(is.matrix(newPoint))
+    a <- predict(model,t(newPoint))$y
+  return(a)
+}

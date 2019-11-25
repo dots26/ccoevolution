@@ -25,7 +25,7 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   }
 
   ## Initial solution:
-  xmean <- par
+  xmean <- drop(par)
   N <- length(xmean)
   ## Box constraints:
   if (missing(lower))
@@ -66,10 +66,10 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   mucov       <- controlParam("ccov.mu", mueff)
   ccov        <- controlParam("ccov.1",
                               (N+2)/3*((1/mucov) * 2/(N+1.4)^2
-                              + (1-1/mucov) * min(1,((2*mucov-1)/((N+2)^2+mucov)))))
+                                       + (1-1/mucov) * min(1,((2*mucov-1)/((N+2)^2+mucov)))))
   damps       <- controlParam("damps",
                               1 + 2*max(0, sqrt((mueff-1)/(N+1))-1) + cs)
-
+  C           <- controlParam("cov", NULL)
   ## Safety checks:
   stopifnot(length(upper) == N)
   stopifnot(length(lower) == N)
@@ -95,11 +95,25 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   ## Initialize dynamic (internal) strategy parameters and constants
   pc <- rep(0.0, N)
   ps <- rep(0.0, N)
-  B <- diag(N)
-  D <- diag(N)
-  BD <- B %*% D
-  C <- BD %*% t(BD)
-
+  if(is.null(C)){
+    B <- diag(N)
+    D <- diag(N)
+    BD <- B %*% D
+    C <- BD %*% t(BD)
+  }else{
+    # e <- eigen(C, symmetric = TRUE)
+    # if (log.eigen)
+    #   eigen.log[iter, ] <- rev(sort(e$values))
+    # if (!all(e$values >= sqrt(.Machine$double.eps) * abs(e$values[1]))) {
+    #   msg <- "Covariance matrix 'C' is numerically not positive definite."
+    #   break
+    # }
+    D <- diag(N)*C
+    D <- sqrt(D)
+    B <- diag(N)
+    # D <- diag(sqrt(e$values), length(e$values))
+    BD <- B %*% D
+  }
   chiN <- sqrt(N) * (1-1/(4*N)+1/(21*N^2))
 
   iter <- 0L      ## Number of iterations
@@ -127,7 +141,7 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     vx <- ifelse(arx > lower, ifelse(arx < upper, arx, upper), lower)
 
     # cutoff to force feasibility # not written in Olaf Mersmann's version
-    arx <- vx
+    # arx <- vx
 
     if (!is.null(nm))
       rownames(vx) <- nm
@@ -238,7 +252,9 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
               convergence=ifelse(iter >= maxiter, 1L, 0L),
               message=msg,
               constr.violations=cviol,
-              diagnostic=log
+              diagnostic=log,
+              cov=C,
+              sigma=sigma
   )
   class(res) <- "cma_es.result"
   return(res)

@@ -23,7 +23,7 @@ cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_
   nEval <- 0
   #groupSize <- 20
   if(is.null(contextVector)){
-    nEval <- nEval + 1000      #10000
+    nEval <- nEval + 10000      #10000
     population <- (randtoolbox::sobol(nEval,nVar,scrambling = 3))*(ubound-lbound)+lbound
 
     objectiveValue <- fun(population,...)
@@ -49,6 +49,15 @@ cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_
       group <- dg$group
     #save(group, file='group.Rdata')
   }
+  convergence_history <- append(convergence_history,bestObj)
+  nlogging_this_layer <- floor(nEval/evalInterval)
+  if(nlogging_this_layer>0){
+    for(i in 1:nlogging_this_layer){
+      nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
+      convergence_history <- append(convergence_history,bestObj)
+      # print(c('conv',convergence_history))
+    }
+  }
   print(group)
   # error checking on groups
   if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
@@ -73,8 +82,7 @@ cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_
                    upper= ubound[groupMember],
                    lower= lbound[groupMember],
                    control = list(vectorized=T,
-                                  mu = groupSize,
-                                  lambda=groupSize,
+                                  mu=min(groupSize,100),lambda=min(groupSize,100),
                                   maxit=900,
                                   sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                   diag.value=T))
@@ -82,10 +90,9 @@ cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
+          nGeneration_to_consider <- floor(nEval_to_logging/min(groupSize,100))
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
-          # print(c('conv',convergence_history))
         }
       }
       nEval <- nEval + best$counts[1]
@@ -100,24 +107,13 @@ cc_2 <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_
         if((budget-nEval)>0){
           bestPop <- newContextVector
           bestObj <- best$value
-          # print('Update:')
-          # print(bestObj)
         }else{
           break
         }
       }
-      # save(list=ls(),file=paste('datacc_',seed,'.Rdata',sep=''))
-    }
+     }
 
-    ## print('Updating context vector')
     contextVector <- newContextVector
   }
   return(list(x=bestPop,y=bestObj,conv=convergence_history))
-}
-
-modelPrediction <- function(newPoint,model){
-  # transpose because cmaes ordering is not compatible with spot
-  if(is.matrix(newPoint))
-    a <- predict(model,t(newPoint))$y
-  return(a)
 }

@@ -9,15 +9,18 @@
 #' f1cec(x,o)
 #' @export
 f1cec <- function(x,o=NULL){ # shifted elliptic
+  if(is.data.frame(x)) x <- data.matrix(x)
   if(is.vector(x))
-    x <- matrix(x,ncol=length(x))
+    x <- matrix(as.numeric(x),ncol=length(x))
 
   if(is.null(o))
     o <- double(ncol(x))
 
   D <- ncol(x)
   z <- x-t(matrix( rep(o,nrow(x) ),nrow=D) )
+  #print()(z)
   z <- t_osz(z)
+  #print()(z)
   res <- f_elliptic(z)
 
   return(res)
@@ -34,8 +37,9 @@ f1cec <- function(x,o=NULL){ # shifted elliptic
 #' f2cec(x,o)
 #' @export
 f2cec <- function(x,o=NULL){ # shifted rastrigin
+  if(is.data.frame(x)) x <- data.matrix(x)
   if(is.vector(x))
-    x <- matrix(x,ncol=length(x))
+    x <- matrix(as.numeric(x),ncol=length(x))
 
   if(is.null(o))
     o <- double(ncol(x))
@@ -62,8 +66,9 @@ f2cec <- function(x,o=NULL){ # shifted rastrigin
 #' f3cec(x,o)
 #' @export
 f3cec <- function(x,o=NULL){ # shifted ackley
+  if(is.data.frame(x)) x <- data.matrix(x)
   if(is.vector(x))
-    x <- matrix(x,ncol=length(x))
+    x <- matrix(as.numeric(x),ncol=length(x))
 
   if(is.null(o))
     o <- double(ncol(x))
@@ -92,10 +97,12 @@ f3cec <- function(x,o=NULL){ # shifted ackley
 #' f4cec(x,o)
 #' @export
 f4cec<- function(x,o=NULL,rotation_matrix,permutation,weight){ # rotated elliptic
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
+
 
   res <- NULL
   group_size <- c(50,25,25,100,50,25,25,700)
@@ -118,8 +125,7 @@ f4cec<- function(x,o=NULL,rotation_matrix,permutation,weight){ # rotated ellipti
     group_sum <- group_sum + weight[i]*f_elliptic(y[,group[[i]]])
   }
   group_sum <- group_sum + f_elliptic(y[,group[[8]]])
-  res <-  (group_sum)
-
+  res <-  (group_sum) # transposed to facilitate Morris method
   return(res)
 }
 
@@ -137,7 +143,8 @@ f4cec<- function(x,o=NULL,rotation_matrix,permutation,weight){ # rotated ellipti
 #' f5cec(x,o)
 #' @export
 f5cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated elliptic
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -183,7 +190,8 @@ f5cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellipt
 #' f6cec(x,o)
 #' @export
 f6cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated elliptic
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -228,7 +236,8 @@ f6cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellipt
 #' f7cec(x,o)
 #' @export
 f7cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated Schwefel
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -254,8 +263,8 @@ f7cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated Schwef
   for(i in 1:7){
     group_sum <- group_sum + weight[i]*f_schewefel_1_2(y[,group[[i]],drop=F])
   }
-  group_sum <- group_sum + f_schewefel_1_2(y[,group[[8]],drop=F])
-  res <-  (group_sum)
+  group_sum <- group_sum + weight[8]*f_sphere(y[,group[[8]],drop=F])
+  res <-  (group_sum) # transposed to facilitate Morris method
   return(res)
 }
 
@@ -272,7 +281,8 @@ f7cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated Schwef
 #' f8cec(x,o)
 #' @export
 f8cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated elliptic
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -299,7 +309,7 @@ f8cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellipt
     group_sum <- group_sum + weight[i]*f_elliptic(y[,group[[i]]])
   }
 
-  res <-  (group_sum)
+  res <- (group_sum) # transposed to facilitate Morris method
   return(res)
 }
 
@@ -315,7 +325,8 @@ f8cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellipt
 #' f9cec(x,o)
 #' @export
 f9cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated rastrigin
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -345,7 +356,7 @@ f9cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated rastri
   for(i in 1:nGroup){
     group_sum <- group_sum + weight[i]*f_rastrigin(y[,group[[i]]])
   }
-  res <-  (group_sum)
+  res <-  (group_sum) # transposed to facilitate Morris method
   return(res)
 }
 
@@ -362,7 +373,8 @@ f9cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated rastri
 #' f10cec(x,o)
 #' @export
 f10cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ackley
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -391,7 +403,7 @@ f10cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ackle
   for(i in 1:nGroup){
     group_sum <- group_sum + weight[i]*f_ackley(y[,group[[i]]])
   }
-  res <-  (group_sum)
+  res <-  (group_sum) # transposed to facilitate Morris method
   return(res)
 }
 
@@ -407,7 +419,8 @@ f10cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ackle
 #' f11cec(x,o)
 #' @export
 f11cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated elliptic
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -451,7 +464,8 @@ f11cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellip
 #' f12cec(x,o)
 #' @export
 f12cec<- function(x,o=NULL){ # rotated Rosenbrock
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -465,7 +479,7 @@ f12cec<- function(x,o=NULL){ # rotated Rosenbrock
   for(i in 1:(ncol(x)-1)){
     group_sum <- group_sum + 100*((y[,i]^2 - y[,i+1])^2) + (y[,i]-1)^2
   }
-  res <-  (group_sum)
+  res <-  (group_sum) # transposed to facilitate Morris method
 
   return(res)
 }
@@ -482,7 +496,8 @@ f12cec<- function(x,o=NULL){ # rotated Rosenbrock
 #' f13cec(x,o)
 #' @export
 f13cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated elliptic
-  x <- matrix(x,ncol=905)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=905)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -497,7 +512,7 @@ f13cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellip
 
   for(i in 1:nGroup){
     group <- append(group,list(groupEnd+(1:group_size[i])))
-    #permutation <- append(permutation,sample.int(group_size[i])+groupStart-1)
+    # permutation <- append(permutation,sample.int(group_size[i])+groupStart-1)
     groupStart <- groupStart + group_size[i] - m
     groupEnd <- groupEnd + group_size[i]
   }
@@ -505,7 +520,6 @@ f13cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellip
   y <- x-t(matrix( rep(o,nrow(x) ),nrow=D) )
 
   y <- y[,permutation,drop=F]
-
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
   y <- t_asy(y,0.2)
@@ -514,7 +528,7 @@ f13cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellip
   for(i in 1:nGroup){
     group_sum <- group_sum + weight[i]*f_schewefel_1_2(y[,group[[i]]])
   }
-  res <-  (group_sum)
+  res <-  (group_sum) # transposed to facilitate Morris method
   return(res)
 }
 
@@ -530,7 +544,8 @@ f13cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellip
 #' f14cec(x,o)
 #' @export
 f14cec<- function(x,o=NULL, rotation_matrix,permutation,weight){
-  x <- matrix(x,ncol=905)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=905)
   D <- ncol(x)
   if(is.null(o))
     o <- double(1000)
@@ -545,7 +560,7 @@ f14cec<- function(x,o=NULL, rotation_matrix,permutation,weight){
 
   for(i in 1:nGroup){
     group <- append(group,list(groupEnd+(1:group_size[i])))
-    #permutation <- append(permutation,sample.int(group_size[i])+groupStart-1)
+    # permutation <- append(permutation,sample.int(group_size[i])+groupStart-1)
     groupStart <- groupStart + group_size[i] - m
     groupEnd <- groupEnd + group_size[i]
   }
@@ -562,7 +577,7 @@ f14cec<- function(x,o=NULL, rotation_matrix,permutation,weight){
   for(i in 1:nGroup){
     group_sum <- group_sum + weight[i]*f_schewefel_1_2(y[,group[[i]]])
   }
-  res <-  (group_sum)
+  res <-  (group_sum) # transposed to facilitate Morris method
   return(res)
 }
 
@@ -578,7 +593,8 @@ f14cec<- function(x,o=NULL, rotation_matrix,permutation,weight){
 #' f15cec(x,o)
 #' @export
 f15cec<- function(x,o=NULL){ # rotated elliptic
-  x <- matrix(x,ncol=1000)
+  if(is.data.frame(x)) x <- data.matrix(x)
+  x <- matrix(as.numeric(x),ncol=1000)
   D <- ncol(x)
   if(is.null(o))
     o <- double(ncol(x))
@@ -592,5 +608,5 @@ f15cec<- function(x,o=NULL){ # rotated elliptic
 
   #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
 
-  return <- f_schewefel_1_2(y)
+  return <-( f_schewefel_1_2(y))
 }
