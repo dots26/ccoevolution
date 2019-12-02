@@ -133,8 +133,10 @@ cma_es <- function(par, fn, ..., lower, upper, control=list()) {
       sigma.log[iter] <- sigma
 
     ## Generate new population:
+
     arz <- matrix(rnorm(N*lambda), ncol=lambda)
     arx <- xmean + sigma * (BD %*% arz)
+
     vx <- ifelse(arx > lower, ifelse(arx < upper, arx, upper), lower)
 
     # cutoff to force feasibility # not written in Olaf Mersmann's version
@@ -167,6 +169,8 @@ cma_es <- function(par, fn, ..., lower, upper, control=list()) {
       }
     }
 
+    print(counteval)
+    print(best.fit)
     ## Order fitness:
     arindex <- order(arfitness)
     arfitness <- arfitness[arindex]

@@ -1,4 +1,4 @@
-#' Two stage cooperative coevolution with CMA-ES
+#' Main function for the cooperative coevolution MOFBVE with multilevel framework
 #'
 #' @title Cooperative coevolution.
 #' @param population Initial population
@@ -11,15 +11,14 @@
 #' optimum <- rep(13,1000)
 #' func <- f1cec
 #' ctrl <- list(lbound=rep(-100,1000),ubound=rep(100,1000),delta=rep(20,1000))
-#' TSCC(nVar = 1000,fun=func,lbound=rep(-100,1000),ubound=rep(100,1000),o=optimum)
+#' TSCC_DE(nVar = 1000,fun=func,lbound=rep(-100,1000),ubound=rep(100,1000),o=optimum)
 #' @export
-TSCC <- function(contextVector=NULL,nVar,
-                 fun,...,
-                 group=NULL,
-                 budget=3000000,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),
-                 nLevel=4,evalInterval=100000,
-                 SA_method=c('morris_mu','morris_k','rf','sobol'),
-                 keepCovariance=F){
+TSCC_DE <- function(contextVector=NULL,nVar,
+                    fun,...,
+                    group=NULL,
+                    budget=3000000,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),
+                    nLevel=4,evalInterval=100000,
+                    SA_method=c('morris_mu','morris_k','rf','sobol')){
   SA_method <- SA_method[1]
   minGroupSize <- 50
   groupWeight <- NULL
@@ -177,7 +176,7 @@ TSCC <- function(contextVector=NULL,nVar,
       clusterOrder <- 1:nLevel
     }
     minWeight <- min(groupWeight)
-    groupPortion <- 1 + log(groupWeight)-log(minWeight)
+    groupPortion <- 1 + floor(log(groupWeight)-log(minWeight))
     totalPortion <- sum(groupPortion)
   }
 
@@ -212,6 +211,8 @@ TSCC <- function(contextVector=NULL,nVar,
   leftBudget <- budget - nEval
 
   CMAES_control <- vector(mode = "list",length=nLevel)
+  DE_control <- vector(mode = "list",length=nLevel)
+
   for(clusterIndex in 1:nLevel){
     cluster_member <- group[[clusterIndex]]
     currentClusterGrouping <- dg[,clusterIndex]$group
@@ -219,11 +220,9 @@ TSCC <- function(contextVector=NULL,nVar,
     groupSize <- length(sep)
     groupMember <- sep
     currentGroupPortion <- groupPortion[[clusterIndex]]
-    CMAES_control[[clusterIndex]]$sep <- list(vectorized=T,
-                                            mu=groupSize,lambda=groupSize,
-                                            maxit=round(3600*currentGroupPortion/totalPortion),
-                                            sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
-                                            diag.value=T)
+
+    DE_control[[clusterIndex]]$sep <- list(ccm=0.5,itermax=round(100*currentGroupPortion/totalPortion))
+    DE_control[[clusterIndex]]$nonsep <- list()
     CMAES_control[[clusterIndex]]$nonsep <- list()
 
     if(length(currentClusterGrouping)>0){
@@ -231,9 +230,10 @@ TSCC <- function(contextVector=NULL,nVar,
         groupMember <- cluster_member[currentClusterGrouping[[groupIndex]]]
         groupSize <- length(groupMember)
         CMAES_control[[clusterIndex]]$nonsep[[groupIndex]] <- list(mu=groupSize,lambda=groupSize,
-                                                                 maxit=round(3600*currentGroupPortion/totalPortion),
-                                                                 sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
-                                                                 diag.value=T)
+                                                                   maxit=round(100*currentGroupPortion/totalPortion),
+                                                                   sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
+                                                                   diag.value=T)
+        DE_control[[clusterIndex]]$nonsep[[groupIndex]] <- list(ccm=0.5,itermax=round(currentGroupPortion))
       }
     }
   }
@@ -242,8 +242,7 @@ TSCC <- function(contextVector=NULL,nVar,
   for(i in 1:nRepeat){
     convergence_history <- append(convergence_history,bestObj)
   }
-  #saved
-  print(nEval)
+
   while((budget-nEval)>0 ){
     for(clusterIndex in 1:nLevel){
       print(paste('Optimizing Variable level',clusterIndex))
@@ -256,36 +255,41 @@ TSCC <- function(contextVector=NULL,nVar,
       # optimize separable
       groupMember <- sep
       groupSize <- length(groupMember)
-
+      NP <- 50
       if(groupSize>0){
         print(c('optimizing separable variables'))
         # group optimization
-        best<- sep_cma_es(contextVector[groupMember],
-                          fn = subfunctionCMA,
-                          contextVector = contextVector,
-                          groupMember = groupMember,mainfun=fun,...,
-                          lower = lbound[groupMember],
-                          upper=ubound[groupMember],
-                          control = CMAES_control[[clusterIndex]]$sep)
-        if(keepCovariance){
-          CMAES_control[[clusterIndex]]$sep$cov <- best$cov
-          CMAES_control[[clusterIndex]]$sep$sigma <- best$sigma * 2
-        }
-        nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
+        # params fname, pop, bestmem, bestval, Lbound, Ubound, itermax, ccm,control,
+        # pop <- matrix(runif(groupSize*NP)*(ubound[groupMember]-lbound[groupMember])-lbound[groupMember],ncol=groupSize)
+        pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
+        best <-  sansde(pop=pop,
+                        bestmem=bestPop[groupMember],
+                        bestval=bestObj,
+                        fname = subfunction,
+                        contextVector = contextVector,
+                        groupMember = groupMember,mainfun=fun,...,
+                        Lbound = lbound[groupMember],
+                        Ubound =ubound[groupMember],
+                        control = DE_control[[clusterIndex]]$sep)
+        DE_control[[clusterIndex]]$sep$ccm <- best$ccm
+
+
+        nlogging_this_layer <- floor((nEval+best$used_FEs[1])/evalInterval)-floor(nEval/evalInterval)
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
             nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
             nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
-            bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+            # bestObj_logging <- min(best$tracerst[1:nGeneration_to_consider,])
+            bestObj_logging <- min(best$tracerst)
             convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
             # print(convergence_history)
           }
         }
-        nEval <- nEval + best$counts[1]
+        nEval <- nEval + best$used_FEs[1]
         if((budget-nEval)>0){ # only update if it doesnt exceed budget
-          if(!is.null(best$par)){
-            contextVector[groupMember] <- best$par
-            obj <- best$value
+          if(!is.null(best$bestmem)){
+            contextVector[groupMember] <- best$bestmem
+            obj <- best$bestval
             if(obj < bestObj){
               bestPop <- contextVector
               bestObj <- obj
@@ -303,37 +307,36 @@ TSCC <- function(contextVector=NULL,nVar,
           print(paste0('subgroup ',groupIndex))
           groupMember <- cluster_member[currentClusterGrouping[[groupIndex]]]
           groupSize <- length(groupMember)
-
-          best<- cma_es(contextVector[groupMember],
-                        fn = subfunctionCMA,
-                        contextVector = contextVector,
-                        groupMember = groupMember,
-                        mainfun=fun,...,
-                        lower = lbound[groupMember],
-                        upper=ubound[groupMember],
-                        # control = list(mu=groupSize,lambda=groupSize,maxit=2000))
-                        control = CMAES_control[[clusterIndex]]$nonsep[[groupIndex]])
-          if(keepCovariance){
-            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$cov <- best$cov
-            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$sigma <- best$sigma * 2
-          }
-          nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
+          NP <- 50
+          # pop <- matrix(runif(groupSize*NP)*(ubound[groupMember]-lbound[groupMember])-lbound[groupMember],ncol=groupSize)
+          pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
+          best <-  sansde(pop=pop,
+                          bestmem=bestPop[groupMember],
+                          bestval=bestObj,
+                          fname = subfunction,
+                          contextVector = contextVector,
+                          groupMember = groupMember,mainfun=fun,...,
+                          Lbound = lbound[groupMember],
+                          Ubound =ubound[groupMember],
+                          control = DE_control[[clusterIndex]]$nonsep[[groupIndex]])
+          DE_control[[clusterIndex]]$nonsep[[groupIndex]]$ccm <- best$ccm
+          nlogging_this_layer <- floor((nEval+best$used_FEs[1])/evalInterval)-floor(nEval/evalInterval)
           if(nlogging_this_layer>0){
             for(i in 1:nlogging_this_layer){
               nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
               nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
-              bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+              # bestObj_logging <- min(best$tracerst[1:nGeneration_to_consider,])
+              bestObj_logging <- min(best$tracerst)
               convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
-              # print(convergence_history)
             }
           }
-          nEval <- nEval + best$counts[1]
+          nEval <- nEval + best$used_FEs[1]
 
           print('updating context vector...')
           if((budget-nEval)>0){ # only update if it doesnt exceed budget
-            if(!is.null(best$par)){
-              contextVector[groupMember] <- best$par
-              obj <- best$value
+            if(!is.null(best$bestmem)){
+              contextVector[groupMember] <- best$bestmem
+              obj <- best$bestval
               if(obj < bestObj){
                 bestPop <- contextVector
                 bestObj <- obj
@@ -355,36 +358,39 @@ TSCC <- function(contextVector=NULL,nVar,
     print('Interconnection')
     groupMember <- 1:nVar
     groupSize <- nVar
-    mu <- 100
-    best <- cma_es(par = contextVector[groupMember],
-                   fn = subfunctionCMA,
-                   contextVector = contextVector,
-                   groupMember = groupMember,
-                   mainfun=fun,...,
-                   lower = lbound,
-                   upper=ubound,
-                   # control = list(vectorized=T,maxit=1000,mu=20,lambda=20))
-                   control = list(vectorized=T,
-                                  maxit=90,
-                                  mu=mu,lambda=mu,
-                                  sigma=0.3*max(ubound-lbound),
-                                  diag.value=T))
-    nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
+    NP <- 50
+    # pop <- matrix(runif(groupSize*NP)*(ubound[groupMember]-lbound[groupMember])-lbound[groupMember],ncol=groupSize)
+    pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
+    best <-  sansde(pop=pop,
+                    bestmem=contextVector,
+                    bestval=bestObj,
+                    fname = subfunction,
+                    contextVector = contextVector,
+                    groupMember = groupMember,mainfun=fun,...,
+                    Lbound = lbound[groupMember],
+                    Ubound =ubound[groupMember],
+                    control = list(itermax=1,ccm=0.5))
+    nlogging_this_layer <- floor((nEval+best$used_FEs)/evalInterval)-floor(nEval/evalInterval)
+    print(nlogging_this_layer)
+    print(nEval)
+    print(best$used_FEs)
+
     if(nlogging_this_layer>0){
       for(i in 1:nlogging_this_layer){
         nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-        nGeneration_to_consider <- floor(nEval_to_logging/mu)
-        bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+        nGeneration_to_consider <- floor(nEval_to_logging/1)
+        print(c(nEval_to_logging,groupSize,nGeneration_to_consider,length(best$tracerst)))
+        # bestObj_logging <- min(best$tracerst[1:nGeneration_to_consider,])
+        bestObj_logging <- min(best$tracerst)
         convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
-        # print(convergence_history)
       }
     }
-    nEval <- nEval + best$counts[1]
+    nEval <- nEval + best$used_FEs[1]
 
     if((budget-nEval)>0){ # only update if it doesnt exceed budget
-      if(!is.null(best$par)){
-        contextVector <- best$par
-        obj <- best$value
+      if(!is.null(best$bestmem)){
+        contextVector <- best$bestmem
+        obj <- best$bestval
         if(obj < bestObj){
           bestPop <- contextVector
           bestObj <- obj
