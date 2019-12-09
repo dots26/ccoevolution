@@ -6,7 +6,6 @@
 \usage{
 optim_sepCMA(contextVector = NULL, nVar, fun, ..., group = NULL,
   budget = 3e+06, lbound = rep(-Inf, nVar), ubound = rep(Inf, nVar),
-  evalInterval = 1e+05)
 }
 \arguments{
 \item{fun}{The objective function object to be solved}
