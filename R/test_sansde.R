@@ -6,7 +6,7 @@
 # Evolutionary Computation (CEC2008), Hongkong, China, 2008, pp. 1110-1116.
 
 ## need to consider bestmem as parent?
-sansde <- function(fname, pop, bestmem, bestval, Lbound, Ubound,control =list(),...){
+sansde <- function(fname, pop, bestmem=NULL, bestval=Inf, Lbound, Ubound,control =list(),...){
   # each row is an individual
   con <- list(ccm=0.5,
               itermax=100)
@@ -66,7 +66,9 @@ sansde <- function(fname, pop, bestmem, bestval, Lbound, Ubound,control =list(),
   ibest <- which.min(val)
   best <- min(val)
   subbestmem <- pop[ibest,]
-
+  if(is.null(bestmem)){
+    bestmem <- subbestmem
+  }
   used_FEs <- 0
   # if (gcount > 1){
   #   used_FEs <- NP
@@ -93,10 +95,10 @@ sansde <- function(fname, pop, bestmem, bestval, Lbound, Ubound,control =list(),
     rt <- pracma::rem(rot+ind[4],NP)
     a5  <- a4[rt+1]
 
-    pm1 <- popold[a1,]# shuffled population 1
-    pm2 <- popold[a2,]# shuffled population 2
-    pm3 <- popold[a3,]# shuffled population 3
-    pm4 <- popold[a4,]# shuffled population 4
+    pm1 <- popold[a1,,drop=F]# shuffled population 1
+    pm2 <- popold[a2,,drop=F]# shuffled population 2
+    pm3 <- popold[a3,,drop=F]# shuffled population 3
+    pm4 <- popold[a4,,drop=F]# shuffled population 4
     pm5 <- popold[a5,]# shuffled population 5
 
     bm <- pracma::ones(NP, 1) %*% bestmem #changed from subbestmem
@@ -148,16 +150,17 @@ sansde <- function(fname, pop, bestmem, bestval, Lbound, Ubound,control =list(),
     aindex=which(aaa == 0)
     bindex=which(aaa != 0)
 
+    save(pm1,pm2,pm3,pm4,file='pm1.Rdata')
     if (!pracma::isempty(bindex)){
       # mutation
-      ui[bindex,] <- popold[bindex,]+ pracma::repmat(F_mat[bindex,,drop=F],1,D) * (bm[bindex,]-popold[bindex,]) + pracma::repmat(F_mat[bindex,,drop=F],1,D) * (pm1[bindex,] - pm2[bindex,] + pm3[bindex,] - pm4[bindex,])
+      ui[bindex,] <- popold[bindex,]+ pracma::repmat(F_mat[bindex,,drop=F],1,D) * (bm[bindex,,drop=F]-popold[bindex,,drop=F]) + pracma::repmat(F_mat[bindex,,drop=F],1,D) * (pm1[bindex,,drop=F] - pm2[bindex,,drop=F] + pm3[bindex,,drop=F] - pm4[bindex,,drop=F])
       # ui[bindex,] <- popold[bindex,] + pracma::repmat(F_mat[bindex,,drop=F],1,D) * (pm1[bindex,] - pm2[bindex,] + pm3[bindex,] - pm4[bindex,])
       # crossover
-      ui[bindex,] <- popold[bindex,]*mpo[bindex,] + ui[bindex,]*mui[bindex,]
+      ui[bindex,] <- popold[bindex,,drop=F]*mpo[bindex,,drop=F] + ui[bindex,,drop=F]*mui[bindex,,drop=F]
     }
     if (!pracma::isempty(aindex)){
-      ui[aindex,] <- pm3[aindex,] + pracma::repmat(F_mat[aindex,,drop=F],1,D)*(pm1[aindex,] - pm2[aindex,])
-      ui[aindex,] <- popold[aindex,]*mpo[aindex,] + ui[aindex,]*mui[aindex,]
+      ui[aindex,] <- pm3[aindex,,drop=F] + pracma::repmat(F_mat[aindex,,drop=F],1,D)*(pm1[aindex,,drop=F] - pm2[aindex,,drop=F])
+      ui[aindex,] <- popold[aindex,,drop=F]*mpo[aindex,,drop=F] + ui[aindex,,drop=F]*mui[aindex,,drop=F]
     }
 
     bbb <- 1-aaa
@@ -235,8 +238,8 @@ sansde <- function(fname, pop, bestmem, bestval, Lbound, Ubound,control =list(),
   bestvalnew <- bestval
 
   return (list(popnew= popnew,
-               bestmemnew=bestmemnew,
-               bestvalnew=bestvalnew,
+               par=bestmemnew,
+               value=bestvalnew,
                tracerst=tracerst,
                ccm=ccm,
                used_FEs=used_FEs))

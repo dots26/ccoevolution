@@ -17,6 +17,7 @@
 #' @export
 cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_control=list(),nCycle=9,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),evalInterval=100000,...){
   doParallel::registerDoParallel()
+  print('new code')
   convergence_history <- NULL
   nEval <- 0
   #groupSize <- 20
@@ -59,18 +60,16 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
   # error checking on groups
   # if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
   # if(!all(unlist(lapply(group,is.vector)))) stop('Sublist of group is of wrong mode, all of them should also be a vector')
-  for(groupIndex in 1:nGroup){
-    groupSize <- length(group[[groupIndex]])
-    groupMember <- group[[groupIndex]]
-    currentGroupPortion <- groupPortion[[groupIndex]]
-    CMAES_control[[groupIndex]] <- list(vectorized=T,
-                                        mu=groupSize,lambda=groupSize,
-                                        maxit=round(3600*currentGroupPortion/totalPortion),
-                                        sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
-                                        diag.value=T)
-    DE_control[[groupIndex]] <- list(ccm=0.5,itermax=round(currentGroupPortion))
+  DE_control <- vector(mode = "list",length=nGroup+1)
+
+  if(nGroup>0){
+    for(groupIndex in 1:nGroup){
+      groupSize <- length(group[[groupIndex]])
+      groupMember <- group[[groupIndex]]
+      DE_control[[groupIndex]] <- list(ccm=0.5,itermax=50)
+    }
   }
-  DE_control[[nGroup+1]]  <- list(ccm=0.5,itermax=round(currentGroupPortion))
+  DE_control[[nGroup+1]]  <- list(ccm=0.5,itermax=50)
 
 
   newContextVector <- contextVector
@@ -83,7 +82,9 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
       groupSize <- length(group[[groupIndex]])
       groupMember <- group[[groupIndex]]
       if(groupSize>0){
+        NP <- 50
         # generate population for current phase
+        pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
         best <-  sansde(pop=pop,
                         bestmem=bestPop[groupMember],
                         bestval=bestObj,
@@ -98,7 +99,7 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
             nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-            nGeneration_to_consider <- floor(nEval_to_logging/min(groupSize,100))
+            nGeneration_to_consider <- floor(nEval_to_logging/NP)
             bestObj_logging <- min(best$tracerst)
             convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
             # print(c('conv',convergence_history))
@@ -112,11 +113,11 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
         leftBudget <- budget - nEval
         print(c('Comp budget left:',leftBudget,budget,nEval))
 
-        if(best$value < bestObj){
+        if(best$bestval < bestObj){
           if((budget-nEval)>0){
             newContextVector[groupMember] <- best$bestmem
             bestPop <- newContextVector
-            bestObj <- best$value
+            bestObj <- best$bestval
             # print('Update:')
             # print(bestObj)
           }else{
@@ -131,6 +132,8 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
     groupSize <- length(dg$separable)
     groupMember <- dg$separable
     if(groupSize>0){
+      NP <- 50
+      pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
       best<- sansde(pop=pop,
                     bestmem=bestPop[groupMember],
                     bestval=bestObj,

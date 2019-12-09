@@ -231,7 +231,7 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
+          nGeneration_to_consider <- floor(nEval_to_logging/NP)
           bestObj_logging <- min(best$tracerst)
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
         }
@@ -240,9 +240,9 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
 
       print('updating context vector for interconnection step...')
       if((budget-nEval)>0){ # only update if it doesnt exceed budget
-        if(!is.null(best$bestmem)){
-          contextVector[groupMember] <- best$bestmem
-          obj <- best$bestval
+        if(!is.null(best$par)){
+          contextVector[groupMember] <- best$par
+          obj <- best$value
           if(obj < bestObj){
             bestPop <- contextVector
             bestObj <- obj
@@ -271,7 +271,7 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
     if(nlogging_this_layer>0){
       for(i in 1:nlogging_this_layer){
         nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-        nGeneration_to_consider <- floor(nEval_to_logging/1)
+        nGeneration_to_consider <- floor(nEval_to_logging/NP)
         bestObj_logging <- min(best$tracerst)
         convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
       }
@@ -280,9 +280,9 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
 
     print('Interconnection step finished, updating context vector...')
     if((budget-nEval)>0){ # only update if it doesnt exceed budget
-      if(!is.null(best$bestmem)){
-        contextVector <- best$bestmem
-        obj <- best$bestval
+      if(!is.null(best$par)){
+        contextVector <- best$par
+        obj <- best$value
         if(obj < bestObj){
           bestPop <- contextVector
           bestObj <- obj
