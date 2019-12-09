@@ -4,17 +4,16 @@
 \alias{InitializePopulationLHS}
 \title{Initialize population with Latin Hypercube Sampling}
 \usage{
-InitializePopulationLHS(numberOfIndividuals, chromosomeLength,
-  minVal = 0, maxVal = 1)
+InitializePopulationLHS(ncol, nrow, minVal = 0, maxVal = 1)
 }
 \arguments{
-\item{numberOfIndividuals}{The number of individual in the population. Integer > 0.}
-
-\item{chromosomeLength}{The number of variables per individual}
-
 \item{minVal}{Minimum value of the resulting sample}
 
 \item{maxVal}{Maximum value of the resulting sample}
+
+\item{numberOfIndividuals}{The number of individual in the population. Integer > 0.}
+
+\item{chromosomeLength}{The number of variables per individual}
 
 \item{binaryEncoding}{whether to use binary encoding or real encoding. Default to FALSE}
 
