@@ -35,10 +35,10 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
       a <- sensitivity::morris(model=fun,
                                factor=nVar,
                                r = r,
-                               design = list(type='oat',levels=8,grid.jump=1),
+                               design = list(type='oat',levels=10,grid.jump=4),
                                binf=lbound,
                                bsup=ubound,
-                               scale=F,...)
+                               scale=T,...)
 
       bestPopIndex <- which.min(a$y)
       bestPop <- a$X[bestPopIndex,]
@@ -46,6 +46,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
 
       contextVector <- bestPop
       nEval <- nEval + r*(nVar+1)
+      save(a,file='ee.Rdata')
       mu.star <- apply(a$ee, 2, function(a) mean(abs(a)))
       sigma <- apply(a$ee, 2, sd)
 
@@ -180,9 +181,8 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
 
     # checkMachineLimit <- log(groupWeight/minWeight)
     # while(is.infinite(checkMachineLimit)
-
     minWeight <- min(groupWeight)
-    groupPortion <- 1 + (log(groupWeight)-log(minWeight))
+    groupPortion <- 1 + floor((log(groupWeight)-log(minWeight)))
     totalPortion <- sum(groupPortion)
   }
 
@@ -230,6 +230,9 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
           nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
+          if(!is.matrix(best$diagnostic$value)){
+            best$diagnostic$value <- matrix(best$diagnostic$value)
+          }
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
         }
@@ -271,7 +274,10 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
     if(nlogging_this_layer>0){
       for(i in 1:nlogging_this_layer){
         nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-        nGeneration_to_consider <- floor(nEval_to_logging/100)
+        nGeneration_to_consider <- floor(nEval_to_logging/mu)
+        if(!is.matrix(best$diagnostic$value)){
+          best$diagnostic$value <- matrix(best$diagnostic$value)
+        }
         bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
         convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
       }

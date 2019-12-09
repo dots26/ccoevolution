@@ -86,7 +86,7 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
             nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-            nGeneration_to_consider <- floor(nEval_to_logging/min(groupSize,100))
+            nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
             bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
             convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
             # print(c('conv',convergence_history))

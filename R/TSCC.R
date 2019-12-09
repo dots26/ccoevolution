@@ -177,13 +177,12 @@ TSCC <- function(contextVector=NULL,nVar,
       clusterOrder <- 1:nLevel
     }
     minWeight <- min(groupWeight)
-    groupPortion <- 1 + log(groupWeight)-log(minWeight)
+    groupPortion <- 1 + floor((log(groupWeight)-log(minWeight)))
     totalPortion <- sum(groupPortion)
   }
-
   print('ordered group')
   print(group)
-
+  print(c(groupPortion,totalPortion))
   print('Secondary Grouping...')
   new_group <- NULL
   dg <- NULL
@@ -206,7 +205,6 @@ TSCC <- function(contextVector=NULL,nVar,
     for(i in 1:nlogging_this_layer){
       nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
       convergence_history <- append(convergence_history,bestObj)
-      # print(c('conv',convergence_history))
     }
   }
   leftBudget <- budget - nEval
@@ -217,23 +215,26 @@ TSCC <- function(contextVector=NULL,nVar,
     currentClusterGrouping <- dg[,clusterIndex]$group
     sep <- group[[clusterIndex]][dg[,clusterIndex]$separable]
     groupSize <- length(sep)
-    groupMember <- sep
-    currentGroupPortion <- groupPortion[[clusterIndex]]
-    CMAES_control[[clusterIndex]]$sep <- list(vectorized=T,
-                                            mu=groupSize,lambda=groupSize,
-                                            maxit=round(3600*currentGroupPortion/totalPortion),
-                                            sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
-                                            diag.value=T)
-    CMAES_control[[clusterIndex]]$nonsep <- list()
 
-    if(length(currentClusterGrouping)>0){
-      for(groupIndex in 1:length(currentClusterGrouping)) {
-        groupMember <- cluster_member[currentClusterGrouping[[groupIndex]]]
-        groupSize <- length(groupMember)
-        CMAES_control[[clusterIndex]]$nonsep[[groupIndex]] <- list(mu=groupSize,lambda=groupSize,
-                                                                 maxit=round(3600*currentGroupPortion/totalPortion),
-                                                                 sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
-                                                                 diag.value=T)
+    if(groupSize>0){
+      groupMember <- sep
+      currentGroupPortion <- groupPortion[[clusterIndex]]
+      CMAES_control[[clusterIndex]]$sep <- list(vectorized=T,
+                                                mu=groupSize,lambda=groupSize,
+                                                maxit=round(3600*currentGroupPortion/totalPortion),
+                                                sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
+                                                diag.value=T)
+      CMAES_control[[clusterIndex]]$nonsep <- list()
+
+      if(length(currentClusterGrouping)>0){
+        for(groupIndex in 1:length(currentClusterGrouping)) {
+          groupMember <- cluster_member[currentClusterGrouping[[groupIndex]]]
+          groupSize <- length(groupMember)
+          CMAES_control[[clusterIndex]]$nonsep[[groupIndex]] <- list(mu=groupSize,lambda=groupSize,
+                                                                     maxit=round(3600*currentGroupPortion/totalPortion),
+                                                                     sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
+                                                                     diag.value=T)
+        }
       }
     }
   }
@@ -243,7 +244,6 @@ TSCC <- function(contextVector=NULL,nVar,
     convergence_history <- append(convergence_history,bestObj)
   }
   #saved
-  print(nEval)
   while((budget-nEval)>0 ){
     for(clusterIndex in 1:nLevel){
       print(paste('Optimizing Variable level',clusterIndex))
@@ -275,7 +275,10 @@ TSCC <- function(contextVector=NULL,nVar,
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
             nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-            nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
+            nGeneration_to_consider <- floor(nEval_to_logging/CMAES_control[[clusterIndex]]$sep$mu)
+            if(!is.matrix(best$diagnostic$value)){
+              best$diagnostic$value <- matrix(best$diagnostic$value)
+            }
             bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
             convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
             # print(convergence_history)
@@ -317,11 +320,15 @@ TSCC <- function(contextVector=NULL,nVar,
             CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$cov <- best$cov
             CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$sigma <- best$sigma * 2
           }
+
           nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
           if(nlogging_this_layer>0){
             for(i in 1:nlogging_this_layer){
               nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-              nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
+              nGeneration_to_consider <- floor(nEval_to_logging/CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$mu)
+              if(!is.matrix(best$diagnostic$value)){
+                best$diagnostic$value <- matrix(best$diagnostic$value)
+              }
               bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
               convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
               # print(convergence_history)
@@ -374,7 +381,11 @@ TSCC <- function(contextVector=NULL,nVar,
       for(i in 1:nlogging_this_layer){
         nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
         nGeneration_to_consider <- floor(nEval_to_logging/mu)
+        if(!is.matrix(best$diagnostic$value)){
+          best$diagnostic$value <- matrix(best$diagnostic$value)
+        }
         bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+
         convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
         # print(convergence_history)
       }
