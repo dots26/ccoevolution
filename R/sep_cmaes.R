@@ -141,7 +141,8 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     vx <- ifelse(arx > lower, ifelse(arx < upper, arx, upper), lower)
 
     # cutoff to force feasibility # not written in Olaf Mersmann's version
-    # arx <- vx
+    # if(force_feasibility)
+    #   arx <- vx
 
     if (!is.null(nm))
       rownames(vx) <- nm
@@ -156,8 +157,8 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
       y <- apply(vx, 2, function(x) fn(x, ...) * fnscale)
     }
     counteval <- counteval + lambda
-
     arfitness <- y * pen
+
     valid <- pen <= 1
 
     if (any(valid)) {
