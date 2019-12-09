@@ -169,8 +169,6 @@ cma_es <- function(par, fn, ..., lower, upper, control=list()) {
       }
     }
 
-    print(counteval)
-    print(best.fit)
     ## Order fitness:
     arindex <- order(arfitness)
     arfitness <- arfitness[arindex]
