@@ -2,7 +2,6 @@
 
 export(DG2)
 export(MOFBVE)
-export(RDG3)
 export(SACC)
 export(SACC_DE)
 export(TSCC)
