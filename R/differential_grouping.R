@@ -18,7 +18,6 @@ XDG <- function(nVar,fun,control=list(),...){
               ubound=rep(1,nVar),
               delta=NULL)
 
-
   con[names(control)] <- control
   center <- con$lbound + (con$ubound-con$lbound)/2
 
@@ -252,7 +251,7 @@ DG2 <- function(nVar,fun,control=list(),...){
       center <- con$lbound+con$delta
     }
 
-    DSM <- diag(nVar)*NA
+    DSM <- zeros(nVar)*NA
     diag(DSM) <- 1
     ISM <- pracma::zeros(nVar)
     p1 <- con$lbound
@@ -304,6 +303,7 @@ DG2 <- function(nVar,fun,control=list(),...){
       }
     }
 
+
     for(i in 1:(nVar-1)){
       for(j in (i+1):nVar){
         maxfun <- max(c(fun_repeat[i], fun1,funj[[i]][j-i],fun_repeat[j]))
@@ -311,9 +311,13 @@ DG2 <- function(nVar,fun,control=list(),...){
 
         eInf <- gammaFunc(2) * maxsum
         eSup <- gammaFunc(nVar^0.5) * maxfun
-        tolerance <- eta0/(eta0+eta1)*eInf + eta1/(eta0+eta1)*eSup
 
         if(is.na(DSM[i,j])){
+          if((eta0+eta1)>0){
+            tolerance <- eta0/(eta0+eta1)*eInf + eta1/(eta0+eta1)*eSup
+          }else{
+            tolerance <- eSup
+          }
           if(ISM[i,j]>tolerance){
             DSM[i,j] <- 1
             DSM[j,i] <- 1
@@ -324,7 +328,6 @@ DG2 <- function(nVar,fun,control=list(),...){
         }
       }
     }
-    print(any(is.na(DSM)))
 
     separable <- NULL
     group <- NULL
@@ -356,154 +359,6 @@ DG2 <- function(nVar,fun,control=list(),...){
   return(list(group=group,separable=separable,DSM=DSM,nEval = nEval))
 }
 
-#' Create groups of variable using Differential Grouping. The code uses the supremum tolerance.
-#' Infimum tolerance is calculated, but given zero weight.
-#'
-#' @title Recursive Differential Grouping with DG2 tolerance setting
-#' @param nVar Number of variables to be grouped
-#' @param fun The objective function to be solved
-#' @param control List of control parameter for DG
-#' \code{lbound} A vector of lower bound values for each variable
-#' \code{ubound} A vector of upper bound values for each variable
-#' \code{delta} The shift from \code{lbound} to compute the gradient
-#' @param ... Further arguments to be passed to fun
-#' @return A list
-#'         \code{group} Lists of the groups found by DG2
-#'         \code{separable} Vector of the separable variables found by DG2
-#'         \code{nEval} number of evaluation used in grouping
-#' @examples
-#' control <- list(lbound=rep(-100,100),ubound=rep(100,100),delta=0.1)
-#' groups <- DG2(nVar=100,f1cec,control,o=rep(13,100))
-#' @references <doi:10.1109/TEVC.2017.2694221>
-#' @export
-RDG3 <- function(nVar,fun,control=list(),...){
-  if(nVar==1){
-    separable <- 1
-    group <- vector(mode='list')
-    nEval <- 0
-    DSM <- as.matrix(1)
-  }else{
-    con <- list(lbound=rep(0,nVar),
-                ubound=rep(1,nVar),
-                delta=NULL)
-
-    con[names(control)] <- control
-    center <- con$lbound + (con$ubound-con$lbound)/2
-
-    nEval <- 0
-
-    group <- vector(mode='list')
-    separable <- NULL
-    ungrouped <- 1:nVar
-
-    if((length(con$lbound) != nVar) || (length(con$ubound) != nVar))  stop('lbound and ubound must be a vector of size nVar')
-
-    if(any(con$lbound > con$ubound)) stop('lbound > ubound')
-
-    if(!is.null(con$delta)){ # if delta is specified, check if lbound + delta will cross ubound
-      if(any((con$lbound+con$delta)>con$ubound)) stop('lbound+delta > ubound, consider smaller delta or removing it to use the midpoint.')
-      center <- con$lbound+con$delta
-    }
-
-    DSM <- diag(nVar)
-    ISM <- diag(nVar) *Inf
-    p1 <- con$lbound
-    fun1 <- fun(p1,...)
-
-    p2_a <- t(matrix(rep(p1,nVar),ncol=nVar))
-    diag(p2_a) <- center
-    fun_repeat <- fun(p2_a,...)
-
-    nEval <- 1+nVar
-    funj <- list()
-    for(i in 1:(nVar-1)){
-      p2 <- t(matrix(rep(p1,nVar-i),ncol=nVar-i))
-      p2[,i] <- center[i]
-      for(ix in 1:nrow(p2)){
-        p2[ix,ix+i] <- center[ix+i]
-      }
-
-      funj <- append(funj,list(fun(p2,...)))
-      nEval <- nEval + nrow(p2)
-
-      for(j in (1:nrow(p2)) ) {
-        delta1 <- fun_repeat[i] - fun1 #up lo lo - lo lo lo
-        delta2 <- funj[[i]][j] - fun_repeat[j+i] #up up lo - lo up lo
-
-        ISM[i,j+i] <- abs(delta2-delta1)
-      }
-    }
-    eta0 <- 0
-    eta1 <- 0
-    for(i in 1:(nVar-1)){
-      for(j in (i+1):nVar){
-        maxfun <- max(c(fun_repeat[i], fun1,funj[[i]][j-i],fun_repeat[j]))
-        maxsum <- max(c(fun_repeat[i]+fun_repeat[j],fun1+funj[[i]][j-i]) )
-        eInf <- gammaFunc(2) * maxsum
-        eSup <- gammaFunc(nVar) * maxfun
-        if(!is.nan(ISM[i,j])){
-          if(ISM[i,j]<eInf){
-            DSM[i,j] <- 0
-            DSM[j,i] <- 0
-            eta0 <- eta0+1
-          }else if(ISM[i,j]>eSup){
-            DSM[i,j] <- 1
-            DSM[j,i] <- 1
-            eta1 <- eta1+1
-          }
-        }
-      }
-    }
-
-    for(i in 1:(nVar-1)){
-      for(j in (i+1):nVar){
-        maxfun <- max(c(fun_repeat[i], fun1,funj[[i]][j-i],fun_repeat[j]))
-        maxsum <- max(c(fun_repeat[i]+fun_repeat[j],fun1+funj[[i]][j-i]) )
-
-        eInf <- gammaFunc(2) * maxsum
-        eSup <- gammaFunc(nVar) * maxfun
-        tolerance <- eta0/(eta0+eta1)*eInf + eta1/(eta0+eta1)*eSup
-        if(!is.nan(ISM[i,j])){
-          if(ISM[i,j]<tolerance){
-            DSM[i,j] <- 0
-            DSM[j,i] <- 0
-          }else{
-            DSM[i,j] <- 1
-            DSM[j,i] <- 1
-          }
-        }
-      }
-    }
-
-    separable <- NULL
-    group <- NULL
-    groupID <- 1
-    assignedGroup <- integer(nVar)
-
-    for(i in 1:(nVar)){
-      if(sum(DSM[i,])==1){
-        separable <- append(separable,i)
-      }else{
-        this.group <- which(DSM[i,]>0)
-        for(j in this.group){
-          if(max(assignedGroup[this.group]!=0)){
-            assignedGroup[this.group] <- max(assignedGroup[this.group])
-          }else{
-            assignedGroup[this.group] <- groupID
-            groupID <- groupID+1
-          }
-        }
-      }
-    }
-    for(i in 1:groupID){
-      groupI <- which(assignedGroup==i)
-      if(length(groupI)>0){
-        group <- append(group,list(groupI))
-      }
-    }
-  }
-  return(list(group=group,separable=separable,DSM=DSM,nEval = nEval))
-}
 
 
 gammaFunc <- function(d){
