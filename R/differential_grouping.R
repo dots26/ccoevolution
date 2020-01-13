@@ -172,11 +172,7 @@ DG <- function(nVar,fun,control=list(),...){
         delta1 <- fun_repeat[i] - fun1 #up lo lo - lo lo lo
         delta2 <- funj[j] - fun_repeat[ungrouped[j+1]] #up up lo - lo up lo
 
-        # if(j==99){
-        #   print(p2_a[ungrouped[j+1],])
-        #   print(p2[j,])
-        # }
-        # print(c('tol:',tolerance,i,j,fun_repeat[i],fun1,funj[j],fun_repeat[ungrouped[j+1]]))
+
 
         if(abs(delta2-delta1)>tolerance){
           additional_member <- ungrouped[j+1]
@@ -251,7 +247,7 @@ DG2 <- function(nVar,fun,control=list(),...){
       center <- con$lbound+con$delta
     }
 
-    DSM <- zeros(nVar)*NA
+    DSM <- pracma::zeros(nVar)*NA
     diag(DSM) <- 1
     ISM <- pracma::zeros(nVar)
     p1 <- con$lbound
@@ -274,12 +270,14 @@ DG2 <- function(nVar,fun,control=list(),...){
       nEval <- nEval + nrow(p2)
 
       for(j in (1:nrow(p2)) ) {
+       # print(c(fun_repeat[i],fun1,funj[[i]][j],fun_repeat[j+1]))
         delta1 <- fun_repeat[i] - fun1 #up lo lo - lo lo lo
         delta2 <- funj[[i]][j] - fun_repeat[j+i] #up up lo - lo up lo
 
         ISM[i,j+i] <- abs(delta2-delta1)
       }
     }
+
     eta0 <- 0
     eta1 <- 0
     for(i in 1:(nVar-1)){
@@ -290,6 +288,7 @@ DG2 <- function(nVar,fun,control=list(),...){
         eSup <- gammaFunc(nVar^0.5) * maxfun
 
         # if(!is.nan(ISM[i,j])){
+        #print(c(ISM[i,j],eInf,eSup))
           if(ISM[i,j]<eInf){
             DSM[i,j] <- 0
             DSM[j,i] <- 0
@@ -299,7 +298,6 @@ DG2 <- function(nVar,fun,control=list(),...){
             DSM[j,i] <- 1
             eta1 <- eta1+1
           }
-        # }
       }
     }
 
@@ -318,6 +316,7 @@ DG2 <- function(nVar,fun,control=list(),...){
           }else{
             tolerance <- eSup
           }
+          print(tolerance)
           if(ISM[i,j]>tolerance){
             DSM[i,j] <- 1
             DSM[j,i] <- 1

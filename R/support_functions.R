@@ -45,6 +45,7 @@ subfunction <- function(population,contextVector,groupMember,mainfun,...){
   contextVector <- t(matrix(contextVector,nrow=nVar))
   contextVector[,groupMember] <- population
 
+  if(is.vector(population)) contextVector <- population
 
   objectiveValue <- mainfun(contextVector,...)
 }
@@ -63,38 +64,33 @@ subfunctionCMA <- function(population,contextVector,groupMember,mainfun,...){
   contextVector <- t(matrix(contextVector,nrow=nVar))
   contextVector[,groupMember] <- population
 
-
   objectiveValue <- mainfun(contextVector,...)
 }
 
-multilevel <- function(group,mainfun,NP=NULL,
+multilevel <- function(group,contextVector,mainfun,NP=NULL,
                        ubound,lbound,
                        budget=3000000,eval_interval=100000,
-                       fname_prefix="datalog_",control=NULL,...){
+                       fname_prefix="datalog_",control=NULL,infill=c("ei","best","setmap"),
+                       surrogate_type=1,bestval=Inf,...){
   nGroup <- length(group)
+  infill <- infill[1]
   globalBest <- Inf
   if(is.null(NP)){
     NP <- rep(20,nGroup)
   }
-  nVar <- length(cv)
+  nVar <- length(contextVector)
   groupLength <- pracma::zeros(1,nGroup)
   for(i in 1:nGroup){
     groupLength[i] <- length(group[[i]])
   }
 
-  #assembledPopulation <- zeros(popsize,nVar)
-  #pop <- vector(mode='list',length = nGroup)
   pop <- InitializePopulationSobol(groupLength[1],NP[1],
-                                 minVal = lbound[group[[1]]],
-                                 maxVal = ubound[group[[1]]])
+                                   minVal = lbound[group[[1]]],
+                                   maxVal = ubound[group[[1]]])
 
   currentGroup <- group[[1]]
-  currentVector <- cv
-  globalBestPop <- cv
-  #TO-DO: globalbest? bestval? check!
-  print(currentVector)
-  print('S')
-  bestval <- Inf
+  currentVector <- contextVector
+  globalBestPop <- contextVector
   valCollection <- NULL
   for(i in 1:NP[1]){
     currentVector[currentGroup] <- pop[i,]
@@ -106,7 +102,7 @@ multilevel <- function(group,mainfun,NP=NULL,
                                    NP[c(-1,-2)],
                                    lbound=lbound,ubound=ubound,
                                    prevnEval = nEval,
-                                   eval_interval,bestval=bestval,...)
+                                   eval_interval,bestval=bestval,infill=infill,...)
     print(paste0('neval:',nEval))
     print(currentVector)
     valCollection <- append(valCollection,funValue$value)
@@ -116,30 +112,55 @@ multilevel <- function(group,mainfun,NP=NULL,
       cv[currentGroup] <<- funValue$par
       globalBestPop <- cv
       globalBest <- funValue$value
+      gb <<- globalBest
     }
   }
   # build surrogate here
   print('top level surrogate build')
-  print(pop)
-  print(valCollection)
-  # rf_model <- SPOT::buildKriging((pop),matrix(valCollection))
-  rf_model <- randomForest::randomForest((pop),(valCollection),ntree=1000)
-
-  pop <- InitializePopulationSobol(ncol=groupLength[1],nrow=NP[1],
-                                 minVal = lbound[group[[1]]],
-                                 maxVal = ubound[group[[1]]])
+  rf_model <- SPOT::buildKriging((pop),matrix(valCollection))
+  # rf_model <- randomForest::randomForest((pop),(valCollection),ntree=1000)
 
   while(nEval < budget){
     # sequential optimization
     print("top level surrogate update")
-    predictedBest <- sansde(fname=evalModel,
-                            pop=pop,
-                            model=rf_model,
-                            bestmem = cv[currentGroup],
-                            bestval = bestval,
-                            Lbound=lbound[currentGroup],
-                            Ubound=ubound[currentGroup],
-                            control=list(itermax=100))$par
+    if(infill=="best"){
+      fname<-bestPredModel
+      # predictedBest <- sansde(fname=fname,
+      #                         pop=pop,
+      #                         model=rf_model,
+      #                         bestmem = cv[currentGroup],
+      #                         bestval = bestval,
+      #                         Lbound=lbound[currentGroup],
+      #                         Ubound=ubound[currentGroup],
+      #                         control=list(itermax=100))$par
+      predicted <- cma_es(fn=fname,
+                              par=contextVector[currentGroup],
+                              model=rf_model,
+                              lower=lbound[currentGroup],
+                              upper=ubound[currentGroup],
+                              control=list(maxit=2000,mu=2,lambda=10,
+                                           sigma=0.3*max(ubound[currentGroup]-lbound[currentGroup])))
+      predictedBest <- predicted$par
+    }else if(infill=="ei"){
+      fname<-EIModel
+      # predictedBest <- sansde(fname=fname,
+      #                         pop=pop,
+      #                         model=rf_model,
+      #                         bestmem = cv[currentGroup],
+      #                         bestval = bestval,
+      #                         Lbound=lbound[currentGroup],
+      #                         Ubound=ubound[currentGroup],
+      #                         control=list(itermax=100),minVal=bestval)$par
+      predicted <- cma_es(fn=fname,
+                              par=contextVector[currentGroup],
+                              model=rf_model,
+                              lower=lbound[currentGroup],
+                              upper=ubound[currentGroup],
+                              minVal=gb,
+                              control=list(maxit=10000,mu=10,lambda=20,
+                                           sigma=0.3*max(ubound[currentGroup]-lbound[currentGroup])))
+      predictedBest <- predicted$par
+    }
 
     currentVector <- cv
     currentVector[currentGroup] <- predictedBest
@@ -150,33 +171,61 @@ multilevel <- function(group,mainfun,NP=NULL,
                                  NP_next = NP[2],
                                  NP_further =  NP[c(-1,-2)],
                                  lbound=lbound,ubound=ubound,
-                                 nEval,eval_interval,bestval=Inf,
+                                 nEval,eval_interval,bestval=Inf,infill=infill,
                                  ...)
-    print(paste0('neval:',nEval,newVal$value))
+    print(paste('neval:',nEval,newVal$value))
     if(newVal$value < globalBest){
-      cv[currentGroup] <<- newVal$par
+      cv[group[[2]]] <<- newVal$par
+      cv[group[[1]]] <<- predictedBest
       globalBestPop <- cv
       globalBest <- funValue$value
+      gb <<- globalBest
     }
     valCollection <- append(valCollection,newVal$value)
     pop <- rbind(pop,predictedBest)
-
+    save(valCollection,pop,file='training.Rdata')
     print(bestval)
     print(t(pop[,1:4]))
+    print(predicted$value)
     print(valCollection)
 
-    rf_model <- randomForest::randomForest((pop),(valCollection),ntree=1000)
-    # rf_model <- SPOT::buildKriging((pop),matrix(valCollection))
+    # rf_model <- randomForest::randomForest(pop,valCollection,ntree=1000)#grf::regression_forest((pop),(valCollection),num.trees=1000)
+    rf_model <- SPOT::buildKriging((pop),matrix(valCollection))
   }
 
   return(list(par=globalBestPop,value=globalBest))
 }
 
-
-
-evalModel <- function(x,model){
+bestPredModel.randomForest <- function(x,model){
+  if(is.vector(x)){
+    x <- matrix(x,nrow=1)
+  }
   pred <- predict(model,x)
   return(pred)
+}
+
+bestPredModel.kriging <- function(x,model){
+  if(is.vector(x)){
+    x <- matrix(x,nrow=1)
+  }
+  pred <- predict(model,x)$y
+  return(pred)
+}
+
+EIModel.kriging <- function(x,model,minVal){
+  if(is.vector(x)){
+    x <- matrix(x,nrow=1)
+  }
+  model$target <- c('y','ei')
+  pred <- predict(model,x)$ei
+  #EI <- SPOT:::expectedImprovement(pred$predictions,pred$variance,minVal)
+  return(pred)
+}
+
+setmapModel <- function(x,model){
+  pred <- predict(model,x,estimate.variance=T)
+  EI <- SPOT:::expectedImprovement(pred$predictions,pred$variance,minVal)
+  return(EI)
 }
 
 tfun <- function(x,mainfun,...){

@@ -10,10 +10,12 @@
 ##'
 ##' @title Covariance matrix adapting evolutionary strategy for separable problem
 ##' @export
-cma_es <- function(par, fn, ..., lower, upper, control=list()) {
+cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F) {
   norm <- function(x)
     drop(sqrt(crossprod(x)))
 
+  # set.seed(100)
+  # print(control)
   controlParam <- function(name, default) {
     v <- control[[name]]
     if (is.null(v))
@@ -80,6 +82,9 @@ cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   best.fit <- fn(par, ...) * fnscale
   best.par <- par
 
+  best.fit_cut <- fn(par, ...) * fnscale
+  best.par_cut <- par
+
   ## Preallocate logging structures:
   if (log.sigma)
     sigma.log <- numeric(maxiter)
@@ -123,12 +128,20 @@ cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   arx <- matrix(0.0, nrow=N, ncol=lambda)
   arfitness <- numeric(lambda)
   while (iter < maxiter) {
+    # print(paste('iter',iter))
+    # print(best.par)
+    # print(best.fit)
+    # print(sigma)
     iter <- iter + 1L
 
     if (!keep.best) {
       best.fit <- Inf
       best.par <- NULL
+      best.fit_cut <- Inf
+      best.par_cut <- NULL
     }
+
+
     if (log.sigma)
       sigma.log[iter] <- sigma
 
@@ -159,14 +172,18 @@ cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     arfitness <- y * pen
     valid <- pen <= 1
 
-
+# print(any(valid))
     if (any(valid)) {
       wb <- which.min(y[valid])
-
       if (y[valid][wb] < best.fit) {
         best.fit <- y[valid][wb]
         best.par <- arx[,valid,drop=FALSE][,wb]
       }
+    }
+    wb_cut <- which.min(y)
+    if (y[wb_cut] < best.fit_cut) {
+      best.fit_cut <- y[wb_cut]
+      best.par_cut <- vx[,wb_cut]
     }
 
     ## Order fitness:
@@ -179,9 +196,15 @@ cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     selz <- arz[,aripop]
     zmean <- drop(selz %*% weights)
 
+
     ## Save selected x value:
-    if (log.pop) pop.log[,,iter] <- selx
-    if (log.value) value.log[iter,] <- arfitness[aripop]
+    if(!logFeasible){
+      if (log.pop) pop.log[,,iter] <- selx
+      if (log.value) value.log[iter,] <- arfitness[aripop]
+    }else{
+      if (log.pop) pop.log[,,iter] <- vx[,aripop]
+      if (log.value) value.log[iter,] <- y[aripop]
+    }
 
     ## Cumulation: Update evolutionary paths
     ps <- (1-cs)*ps + sqrt(cs*(2-cs)*mueff) * (B %*% zmean)
@@ -247,6 +270,11 @@ cma_es <- function(par, fn, ..., lower, upper, control=list()) {
 
   ## Drop names from value object
   names(best.fit) <- NULL
+  if(logFeasible){
+    best.fit <- best.fit_cut
+    best.par <- best.par_cut
+  }
+
   res <- list(par=best.par,
               value=best.fit / fnscale,
               counts=cnt,

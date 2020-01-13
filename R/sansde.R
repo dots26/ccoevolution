@@ -1,11 +1,9 @@
-
 # Optimize the subcomponent using SaNSDE
 # The SaNSDE algorithm can be found in:
 # Zhenyu Yang, Ke Tang and Xin Yao, "Self-adaptive Differential Evolution with
 # Neightborhood Search", in Proceedings of the 2008 IEEE Congress on
 # Evolutionary Computation (CEC2008), Hongkong, China, 2008, pp. 1110-1116.
 
-## need to consider bestmem as parent?
 sansde <- function(fname, pop, bestmem=NULL, bestval=Inf, Lbound, Ubound,control =list(),...){
   # each row is an individual
   con <- list(ccm=0.5,
@@ -150,7 +148,6 @@ sansde <- function(fname, pop, bestmem=NULL, bestval=Inf, Lbound, Ubound,control
     aindex=which(aaa == 0)
     bindex=which(aaa != 0)
 
-    save(pm1,pm2,pm3,pm4,file='pm1.Rdata')
     if (!pracma::isempty(bindex)){
       # mutation
       ui[bindex,] <- popold[bindex,]+ pracma::repmat(F_mat[bindex,,drop=F],1,D) * (bm[bindex,,drop=F]-popold[bindex,,drop=F]) + pracma::repmat(F_mat[bindex,,drop=F],1,D) * (pm1[bindex,,drop=F] - pm2[bindex,,drop=F] + pm3[bindex,,drop=F] - pm4[bindex,,drop=F])
@@ -237,7 +234,7 @@ sansde <- function(fname, pop, bestmem=NULL, bestval=Inf, Lbound, Ubound,control
   bestmemnew <- bestmem
   bestvalnew <- bestval
 
-  return (list(popnew= popnew,
+  return (list(pop= popnew,
                par=bestmemnew,
                value=bestvalnew,
                tracerst=tracerst,

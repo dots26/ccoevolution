@@ -16,7 +16,7 @@
 #' cc(nVar = 100,fun=func,group=group,nCycle = 2,o=optimum,lbound=rep(-100,100),ubound=rep(100,100))
 #' @export
 cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_control=list(),nCycle=9,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),evalInterval=100000,...){
-  doParallel::registerDoParallel()
+  #doParallel::registerDoParallel()
   convergence_history <- NULL
   nEval <- 0
   #groupSize <- 20
@@ -53,6 +53,8 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
       # print(c('conv',convergence_history))
     }
   }
+  print(nlogging_this_layer)
+  print(nEval)
   print(group)
   print(dg$separable)
 

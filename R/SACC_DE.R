@@ -34,7 +34,7 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
       a <- sensitivity::morris(model=fun,
                                factor=nVar,
                                r = r,
-                               design = list(type='oat',levels=8,grid.jump=1),
+                               design = list(type='oat',levels=8,grid.jump=4),
                                binf=lbound,
                                bsup=ubound,
                                scale=F,...)
@@ -181,22 +181,33 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
     # while(is.infinite(checkMachineLimit)
 
     minWeight <- min(groupWeight)
-    groupPortion <- 1 + floor((log(groupWeight)-log(minWeight)))
+    groupPortion <- vector(length=length(groupWeight))
+    for(groupIndex in 1:length(groupWeight)){
+      if(log(groupWeight[groupIndex])>0){
+        groupPortion[groupIndex] <- 1 + log(groupWeight[groupIndex])
+      }else{
+        groupPortion[groupIndex] <- 1
+      }
+    }
     totalPortion <- sum(groupPortion)
   }
 
   CMAES_control <- list()
   DE_control <- list()
+  pop <- list()
+  NP <- 50
   for(groupIndex in 1:nLevel){
     groupSize <- length(group[[groupIndex]])
     groupMember <- group[[groupIndex]]
-    currentGroupPortion <- groupPortion[[groupIndex]]
+    currentGroupPortion <- groupPortion[groupIndex]
     CMAES_control[[groupIndex]] <- list(vectorized=T,
                                         mu=groupSize,lambda=groupSize,
-                                        maxit=round(3600*currentGroupPortion/totalPortion),
+                                        maxit=2000*round(currentGroupPortion/totalPortion),
                                         sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                         diag.value=T)
     DE_control[[groupIndex]] <- list(ccm=0.5,itermax=round(currentGroupPortion))
+    pop[[groupIndex]] <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
+
   }
   if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
   if(!all(unlist(lapply(group,is.vector)))) stop('Sublist of group is of wrong mode, all of them should also be a vector')
@@ -209,13 +220,12 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
   while((budget-nEval)>0){
     for(groupIndex in 1:length(group)) {
       groupSize <- length(group[[groupIndex]])
-      NP <- 50
+      #NP <- 50
       groupMember <- group[[groupIndex]]
-      currentGroupPortion <- groupPortion[[groupIndex]]
+      currentGroupPortion <- groupPortion[groupIndex]
       print(paste0('optimizing group ',groupIndex,' with ',groupSize,' members, ',currentGroupPortion/totalPortion*100,'% portion'))
       # group optimization
-      pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
-      best <-  sansde(pop=pop,
+      best <-  sansde(pop=pop[[groupIndex]],
                       bestmem=bestPop[groupMember],
                       bestval=bestObj,
                       fname = subfunction,
@@ -224,6 +234,7 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
                       Lbound = lbound[groupMember],
                       Ubound =ubound[groupMember],
                       control = DE_control[[groupIndex]])
+      pop[[groupIndex]] <- best$pop
       DE_control[[groupIndex]]$ccm <- best$ccm
 
       nlogging_this_layer <- floor((nEval+best$used_FEs)/evalInterval)-floor(nEval/evalInterval)
@@ -238,7 +249,6 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
       }
       nEval <- nEval + best$used_FEs
 
-      print('updating context vector for interconnection step...')
       if((budget-nEval)>0){ # only update if it doesnt exceed budget
         if(!is.null(best$par)){
           contextVector[groupMember] <- best$par
@@ -253,44 +263,43 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
       }
     }
     # Interconnection
-    groupMember <- 1:nVar
-    groupSize <- nVar
-    NP <- 50
-    pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
-    best <-  sansde(pop=pop,
-                    bestmem=contextVector,
-                    bestval=bestObj,
-                    fname = subfunction,
-                    contextVector = contextVector,
-                    groupMember = groupMember,mainfun=fun,...,
-                    Lbound = lbound[groupMember],
-                    Ubound =ubound[groupMember],
-                    control = list(itermax=1,ccm=0.5))
-    nlogging_this_layer <- floor((nEval+best$used_FEs)/evalInterval)-floor(nEval/evalInterval)
-
-    if(nlogging_this_layer>0){
-      for(i in 1:nlogging_this_layer){
-        nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-        nGeneration_to_consider <- floor(nEval_to_logging/NP)
-        bestObj_logging <- min(best$tracerst)
-        convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
-      }
-    }
-    nEval <- nEval + best$used_FEs
-
-    print('Interconnection step finished, updating context vector...')
-    if((budget-nEval)>0){ # only update if it doesnt exceed budget
-      if(!is.null(best$par)){
-        contextVector <- best$par
-        obj <- best$value
-        if(obj < bestObj){
-          bestPop <- contextVector
-          bestObj <- obj
-        }
-      }
-    }else{
-      break
-    }
+    # groupMember <- 1:nVar
+    # groupSize <- nVar
+    # NP <- 50
+    # pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
+    # best <-  sansde(pop=pop,
+    #                 bestmem=contextVector,
+    #                 bestval=bestObj,
+    #                 fname = subfunction,
+    #                 contextVector = contextVector,
+    #                 groupMember = groupMember,mainfun=fun,...,
+    #                 Lbound = lbound[groupMember],
+    #                 Ubound =ubound[groupMember],
+    #                 control = list(itermax=1,ccm=0.5))
+    # nlogging_this_layer <- floor((nEval+best$used_FEs)/evalInterval)-floor(nEval/evalInterval)
+    #
+    # if(nlogging_this_layer>0){
+    #   for(i in 1:nlogging_this_layer){
+    #     nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
+    #     nGeneration_to_consider <- floor(nEval_to_logging/NP)
+    #     bestObj_logging <- min(best$tracerst)
+    #     convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
+    #   }
+    # }
+    # nEval <- nEval + best$used_FEs
+    #
+    # if((budget-nEval)>0){ # only update if it doesnt exceed budget
+    #   if(!is.null(best$par)){
+    #     contextVector <- best$par
+    #     obj <- best$value
+    #     if(obj < bestObj){
+    #       bestPop <- contextVector
+    #       bestObj <- obj
+    #     }
+    #   }
+    # }else{
+    #   break
+    # }
     leftBudget <- budget - nEval
     print(c('Comp budget left:',leftBudget,budget,nEval))
   }

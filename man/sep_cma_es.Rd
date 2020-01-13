@@ -7,6 +7,7 @@
 The code is a minor modification from cmaes::cma_es(), specialized to handle separable function
 }
 \usage{
+sep_cma_es(par, fn, ..., lower, upper, control = list())
 }
 \description{
 Global optimization procedure using a covariance matrix adapting

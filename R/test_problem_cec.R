@@ -18,9 +18,8 @@ f1cec <- function(x,o=NULL){ # shifted elliptic
 
   D <- ncol(x)
   z <- x-t(matrix( rep(o,nrow(x) ),nrow=D) )
-  #print()(z)
+
   z <- t_osz(z)
-  #print()(z)
   res <- f_elliptic(z)
 
   return(res)
@@ -164,9 +163,13 @@ f5cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellipt
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
-  z1 <- as.vector(ill_lambda(10,ncol(y)))
-  y <- t(t_asy(y,0.2))*z1
-  y <- t(y)
+
+  nGroup <- 8
+  for(groupIndex in 1:nGroup){
+    thisGroup <- group[[groupIndex]]
+    z1 <- as.vector(ill_lambda(10,length(thisGroup)))
+    y[,thisGroup] <-t( t(t_asy(y[,thisGroup],0.2))*z1 )
+  }
 
   group_sum <-numeric(nrow(x))
 
@@ -207,12 +210,19 @@ f6cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellipt
   }
 
   y <- x-t(matrix( rep(o,nrow(x) ),nrow=D) )
+
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
-  z1 <- as.vector(ill_lambda(10,ncol(y)))
-  y <- t(t_asy(y,0.2))*z1
-  y <- t(y)
+
+
+  nGroup <- 8
+  for(groupIndex in 1:nGroup){
+    thisGroup <- group[[groupIndex]]
+    z1 <- as.vector(ill_lambda(10,length(thisGroup)))
+    y[,thisGroup] <-t( t(t_asy(y[,thisGroup] ,0.2))*z1 )
+  }
+  #print(y)
 
   group_sum <-numeric( nrow(x) )
   for(i in 1:7){
@@ -256,7 +266,10 @@ f7cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated Schwef
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
-  y <- t_asy(y,0.2)
+  for(groupIndex in 1:nGroup){
+    thisGroup <- group[[groupIndex]]
+    y[,thisGroup] <- t_asy(y[,thisGroup] ,0.2)
+  }
   #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
 
   group_sum <-numeric(nrow(x))
@@ -348,9 +361,11 @@ f9cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated rastri
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
-  z1 <- as.vector(ill_lambda(10,ncol(y)))
-  y <- t(t_asy(y,0.2))*z1
-  y <- t(y)
+  for(groupIndex in 1:nGroup){
+    thisGroup <- group[[groupIndex]]
+    z1 <- as.vector(ill_lambda(10,length(thisGroup)))
+    y[,thisGroup] <-t( t(t_asy(y[,thisGroup] ,0.2))*z1 )
+  }
 
   group_sum <-numeric(nrow(x))
   for(i in 1:nGroup){
@@ -395,10 +410,11 @@ f10cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ackle
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
-  z1 <- as.vector(ill_lambda(10,ncol(y)))
-  y <- t(t_asy(y,0.2))*z1
-  y <- t(y)
-
+  for(groupIndex in 1:nGroup){
+    thisGroup <- group[[groupIndex]]
+    z1 <- as.vector(ill_lambda(10,length(thisGroup)))
+    y[,thisGroup] <-t( t(t_asy(y[,thisGroup] ,0.2))*z1 )
+  }
   group_sum <-numeric(nrow(x))
   for(i in 1:nGroup){
     group_sum <- group_sum + weight[i]*f_ackley(y[,group[[i]]])
@@ -440,10 +456,13 @@ f11cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellip
   y <- x-t(matrix( rep(o,nrow(x) ),nrow=D) )
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
-  y <- t_osz(y)
-  y <- t_asy(y,0.2)
-  #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
 
+  for(groupIndex in 1:nGroup){
+    thisGroup <- group[[groupIndex]]
+    y[,thisGroup] <- t_asy(y[,thisGroup] ,0.2)
+  }
+  #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
+  #print(y)
   group_sum <-numeric(nrow(x))
   for(i in 1:nGroup){
     group_sum <- group_sum + weight[i]*f_schewefel_1_2(y[,group[[i]]])
@@ -522,7 +541,10 @@ f13cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated ellip
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
-  y <- t_asy(y,0.2)
+  for(groupIndex in 1:nGroup){
+    thisGroup <- group[[groupIndex]]
+    y[,thisGroup] <- t_asy(y[,thisGroup] ,0.2)
+  }
   #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
   group_sum <-numeric(nrow(x))
   for(i in 1:nGroup){
@@ -569,7 +591,10 @@ f14cec<- function(x,o=NULL, rotation_matrix,permutation,weight){
   #y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
-  y <- t_asy(y,0.2)
+  for(groupIndex in 1:nGroup){
+    thisGroup <- group[[groupIndex]]
+    y[,thisGroup] <- t_asy(y[,thisGroup] ,0.2)
+  }
 
   #y <-t_asy(y,0.2)*ill_lambda(10,ncol(y))
 

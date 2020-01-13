@@ -16,8 +16,8 @@
 #' cc_de(nVar = 100,fun=func,group=group,nCycle = 2,o=optimum,lbound=rep(-100,100),ubound=rep(100,100))
 #' @export
 cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_control=list(),nCycle=9,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),evalInterval=100000,...){
-  doParallel::registerDoParallel()
-  print('new code')
+  #doParallel::registerDoParallel()
+  print('newest code')
   convergence_history <- NULL
   nEval <- 0
   #groupSize <- 20
@@ -61,16 +61,21 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
   # if(!is.list(group)) stop('group is of wrong mode, it should be a list.')
   # if(!all(unlist(lapply(group,is.vector)))) stop('Sublist of group is of wrong mode, all of them should also be a vector')
   DE_control <- vector(mode = "list",length=nGroup+1)
+  pop <- vector(mode = "list",length=nGroup+1)
 
+  NP <- 50
   if(nGroup>0){
     for(groupIndex in 1:nGroup){
       groupSize <- length(group[[groupIndex]])
       groupMember <- group[[groupIndex]]
-      DE_control[[groupIndex]] <- list(ccm=0.5,itermax=50)
+      DE_control[[groupIndex]] <- list(ccm=0.5,itermax=1)
+      pop[[groupIndex]] <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
     }
   }
-  DE_control[[nGroup+1]]  <- list(ccm=0.5,itermax=50)
-
+  groupSize <- length(dg$separable)
+  groupMember <- dg$separable
+  DE_control[[nGroup+1]]  <- list(ccm=0.5,itermax=1)
+  pop[[nGroup+1]] <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
 
   newContextVector <- contextVector
   leftBudget <- budget - nEval
@@ -82,10 +87,8 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
       groupSize <- length(group[[groupIndex]])
       groupMember <- group[[groupIndex]]
       if(groupSize>0){
-        NP <- 50
         # generate population for current phase
-        pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
-        best <-  sansde(pop=pop,
+        best <-  sansde(pop=pop[[groupIndex]],
                         bestmem=bestPop[groupMember],
                         bestval=bestObj,
                         fname = subfunction,
@@ -94,6 +97,7 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
                         Lbound = lbound[groupMember],
                         Ubound =ubound[groupMember],
                         control = DE_control[[groupIndex]])
+        pop[[groupIndex]] <- best$pop
         DE_control[[groupIndex]]$ccm <- best$ccm
         nlogging_this_layer <- floor((nEval+best$used_FEs)/evalInterval)-floor(nEval/evalInterval)
         if(nlogging_this_layer>0){
@@ -112,12 +116,11 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
 
         leftBudget <- budget - nEval
         print(c('Comp budget left:',leftBudget,budget,nEval))
-
-        if(best$bestval < bestObj){
+        if(best$value < bestObj){
           if((budget-nEval)>0){
-            newContextVector[groupMember] <- best$bestmem
+            newContextVector[groupMember] <- best$par
             bestPop <- newContextVector
-            bestObj <- best$bestval
+            bestObj <- best$value
             # print('Update:')
             # print(bestObj)
           }else{
@@ -132,9 +135,7 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
     groupSize <- length(dg$separable)
     groupMember <- dg$separable
     if(groupSize>0){
-      NP <- 50
-      pop <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
-      best<- sansde(pop=pop,
+      best<- sansde(pop=pop[[nGroup+1]],
                     bestmem=bestPop[groupMember],
                     bestval=bestObj,
                     fname = subfunction,
@@ -143,6 +144,7 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
                     Lbound = lbound[groupMember],
                     Ubound =ubound[groupMember],
                     control = DE_control[[nGroup+1]])
+      pop[[nGroup+1]] <- best$pop
       nlogging_this_layer <- floor((nEval+best$used_FEs)/evalInterval)-floor(nEval/evalInterval)
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
@@ -159,11 +161,13 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
       leftBudget <- budget - nEval
       print(c('Comp budget left:',leftBudget,budget,nEval))
 
-      if(best$bestval < bestObj){
+      print(best$value)
+
+      if(best$value < bestObj){
         if((budget-nEval)>0){
-          newContextVector[groupMember] <- best$bestmem
+          newContextVector[groupMember] <- best$par
           bestPop <- newContextVector
-          bestObj <- best$bestval
+          bestObj <- best$value
           # print('Update:')
           # print(bestObj)
         }else{

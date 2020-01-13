@@ -181,7 +181,9 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
 
     ## Save selected x value:
     if (log.pop) pop.log[,,iter] <- selx
-    if (log.value) value.log[iter,] <- arfitness[aripop]
+    if (log.value) {
+      value.log[iter,] <- arfitness[aripop]
+    }
 
     ## Cumulation: Update evolutionary paths
     ps <- (1-cs)*ps + sqrt(cs*(2-cs)*mueff) * (B %*% zmean)
@@ -212,6 +214,8 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
 
 
     ## break if fit:
+
+
     if (arfitness[1] <= stopfitness * fnscale) {
       msg <- "Stop fitness reached."
       break

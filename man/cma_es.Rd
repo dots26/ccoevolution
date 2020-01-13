@@ -7,7 +7,7 @@
 The code is a minor modification from cmaes::cma_es(), adding cutoff on the box constraint. (line 128)
 }
 \usage{
-cma_es(par, fn, ..., lower, upper, control = list())
+cma_es(par, fn, ..., lower, upper, control = list(), logFeasible = F)
 }
 \description{
 Global optimization procedure using a covariance matrix adapting

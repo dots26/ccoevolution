@@ -67,7 +67,7 @@ t_osz <- function(x){
   c1 <- 10*as.integer(x>0) +  5.5*as.integer(x<=0)
   c2 <- 7.9*as.integer(x>0) +  3.1*as.integer(x<=0)
 
-  t <- sign(x) * exp( xlog + 0.0049*sin(c1*xlog) + sin(c2*xlog ))
+  t <- sign(x) * exp( xlog + 0.049*( sin(c1*xlog) + sin(c2*xlog) ) )
 }
 
 t_asy <- function(x,beta){
@@ -81,7 +81,6 @@ t_asy <- function(x,beta){
   t1 <- x^(1+beta_term*(x^0.5))*as.integer(x>0)
 
   t2 <- x*as.integer(x<=0)
-
   t1[which(is.nan(t1))]  <- 0
   t <- t1+t2
 

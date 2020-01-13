@@ -30,7 +30,7 @@ optim_sepCMA <- function(contextVector=NULL,nVar,fun,...,
     groupMember <- 1:nVar
     CMAES_control <- list(vectorized=T,
                           mu=groupSize,lambda=groupSize,
-                          maxit=(budget-nEval)/1000-1,
+                          maxit=round((budget-nEval)/1000)-1,
                           sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                           diag.value=T)
     # group optimization
@@ -52,7 +52,6 @@ optim_sepCMA <- function(contextVector=NULL,nVar,fun,...,
       }
     }
     nEval <- nEval + best$counts[1]
-    print('updating context vector...')
     if((budget-nEval)>0){ # only update if it doesnt exceed budget
       if(!is.null(best$par)){
         contextVector[groupMember] <- best$par
