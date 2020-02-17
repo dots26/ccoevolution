@@ -260,35 +260,35 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
       message(sprintf("Iteration %i of %i: current fitness %f",
                       iter, maxiter, arfitness[1] * fnscale))
 
-    # if(sigma>=starting_sigma*TolUpSigma){
-    #   message(sprintf("Sigma divergence detected! Terminating."))
-    #   term_code <- 1
-    #   break
-    # }
-    #
-    # if(no_improve_count >= max_no_improve){
-    #   message(sprintf("No fitness improvement for %i generation. Terminating.",max_no_improve))
-    #   term_code <- 2
-    #   break
-    # }
-    #
-    # if(checkNoEffectAxis(xmean,BD,sigma)){
-    #   message(sprintf("Addition of 0.1 times sigma does not change mean value."))
-    #   term_code <- 3
-    #   break
-    # }
-    #
-    # if(checkNoEffectCoord(xmean,sigma)){
-    #   message(sprintf("Addition of 0.2 times sigma does not change mean value."))
-    #   term_code <- 4
-    #   break
-    # }
-    #
-    # if(checkCondNumber(C)){
-    #   message(sprintf("Cov matrix condition number exceed 1e14."))
-    #   term_code <- 5
-    #   break
-    # }
+    if(sigma>=starting_sigma*TolUpSigma){
+      message(sprintf("Sigma divergence detected! Terminating."))
+      term_code <- 1
+      break
+    }
+
+    if(no_improve_count >= max_no_improve){
+      message(sprintf("No fitness improvement for %i generation. Terminating.",max_no_improve))
+      term_code <- 2
+      break
+    }
+
+    if(checkNoEffectAxis(xmean,BD,sigma)){
+      message(sprintf("Addition of 0.1 times sigma does not change mean value."))
+      term_code <- 3
+      break
+    }
+
+    if(checkNoEffectCoord(xmean,sigma)){
+      message(sprintf("Addition of 0.2 times sigma does not change mean value."))
+      term_code <- 4
+      break
+    }
+
+    if(checkCondNumber(C)){
+      message(sprintf("Cov matrix condition number exceed 1e14."))
+      term_code <- 5
+      break
+    }
   }
   cnt <- c(`function`=as.integer(counteval), gradient=NA)
 
