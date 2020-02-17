@@ -190,12 +190,13 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
       }
     }
     totalPortion <- sum(groupPortion)
+    print(groupPortion)
   }
 
   CMAES_control <- list()
   DE_control <- list()
   pop <- list()
-  NP <- 50
+
   for(groupIndex in 1:nLevel){
     groupSize <- length(group[[groupIndex]])
     groupMember <- group[[groupIndex]]
@@ -220,10 +221,10 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
   while((budget-nEval)>0){
     for(groupIndex in 1:length(group)) {
       groupSize <- length(group[[groupIndex]])
-      #NP <- 50
+      NP <- 50
       groupMember <- group[[groupIndex]]
       currentGroupPortion <- groupPortion[groupIndex]
-      print(paste0('optimizing group ',groupIndex,' with ',groupSize,' members, ',currentGroupPortion/totalPortion*100,'% portion'))
+      #print(paste0('optimizing group ',groupIndex,' with ',groupSize,' members, ',currentGroupPortion/totalPortion*100,'% portion'))
       # group optimization
       best <-  sansde(pop=pop[[groupIndex]],
                       bestmem=bestPop[groupMember],
@@ -302,6 +303,7 @@ SACC_DE <- function(contextVector=NULL,nVar,fun,...,
     # }
     leftBudget <- budget - nEval
     print(c('Comp budget left:',leftBudget,budget,nEval))
+    print(bestObj)
   }
   return(list(x=bestPop,y=bestObj,conv=convergence_history))
 }

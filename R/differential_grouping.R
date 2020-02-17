@@ -255,7 +255,12 @@ DG2 <- function(nVar,fun,control=list(),...){
 
     p2_a <- t(matrix(rep(p1,nVar),ncol=nVar))
     diag(p2_a) <- center
-    fun_repeat <- fun(p2_a,...)
+    # vectorized, not working on ubuntu
+    # fun_repeat <- fun(p2_a,...)
+
+    fun_repeat <- vector()
+    for(i in 1:nrow(p2_a))
+      fun_repeat[i] <- fun(p2_a[i,],...)
 
     nEval <- 1+nVar
     funj <- list()
@@ -265,8 +270,12 @@ DG2 <- function(nVar,fun,control=list(),...){
       for(ix in 1:nrow(p2)){
         p2[ix,ix+i] <- center[ix+i]
       }
-
-      funj <- append(funj,list(fun(p2,...)))
+      funj_this <- vector()
+      for(i_this in 1:nrow(p2))
+        funj_this[i_this] <- fun(p2[i_this,],...)
+      # vectorized, not working on ubuntu
+      # funj <- append(funj,list(fun(p2,...)))
+      funj <- append(funj,list(funj_this))
       nEval <- nEval + nrow(p2)
 
       for(j in (1:nrow(p2)) ) {
@@ -288,7 +297,7 @@ DG2 <- function(nVar,fun,control=list(),...){
         eSup <- gammaFunc(nVar^0.5) * maxfun
 
         # if(!is.nan(ISM[i,j])){
-        #print(c(ISM[i,j],eInf,eSup))
+        # print(c(ISM[i,j],eInf,eSup))
           if(ISM[i,j]<eInf){
             DSM[i,j] <- 0
             DSM[j,i] <- 0
@@ -310,24 +319,27 @@ DG2 <- function(nVar,fun,control=list(),...){
         eInf <- gammaFunc(2) * maxsum
         eSup <- gammaFunc(nVar^0.5) * maxfun
 
+        # print(DSM[i,j])
         if(is.na(DSM[i,j])){
           if((eta0+eta1)>0){
             tolerance <- eta0/(eta0+eta1)*eInf + eta1/(eta0+eta1)*eSup
           }else{
             tolerance <- eSup
           }
-          print(tolerance)
+          # print(c(ISM[i,j],tolerance))
           if(ISM[i,j]>tolerance){
+            # print('suc')
             DSM[i,j] <- 1
             DSM[j,i] <- 1
           }else{
+            # print('fail')
             DSM[i,j] <- 0
             DSM[j,i] <- 0
           }
         }
       }
     }
-
+# save(DSM,ISM,eta0,eta1,fun_repeat,fun1,funj,file='DSM.Rdata')
     separable <- NULL
     group <- NULL
     groupID <- 1

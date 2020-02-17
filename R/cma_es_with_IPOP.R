@@ -4,18 +4,18 @@
 ##' Global optimization procedure using a covariance matrix adapting
 ##' evolutionary strategy for separable functions.
 ##'
-##' @source The code is a minor modification from cmaes::cma_es(), specialized to handle separable function
+##' @source The code is a minor modification from cmaes::cma_es(), adding cutoff on the box constraint. (line 128)
 ##'
 ##' @seealso \code{\link[cmaes]{cma_es}}
 ##'
-##' @references <doi:10.1007/978-3-540-87700-4_30>
-##'
 ##' @title Covariance matrix adapting evolutionary strategy for separable problem
 ##' @export
-sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
+cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,limit_sigma=F) {
   norm <- function(x)
     drop(sqrt(crossprod(x)))
 
+  # set.seed(100)
+  # print(control)
   controlParam <- function(name, default) {
     v <- control[[name]]
     if (is.null(v))
@@ -37,6 +37,8 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     upper <- rep(Inf, N)
   else if (length(upper) == 1)
     upper <- rep(upper, N)
+
+  range <- max(upper-lower)
 
   ## Parameters:
   trace       <- controlParam("trace", FALSE)
@@ -65,17 +67,16 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   cs          <- controlParam("cs", (mueff+2)/(N+mueff+3))
   mucov       <- controlParam("ccov.mu", mueff)
   ccov        <- controlParam("ccov.1",
-                              (N+2)/3*((1/mucov) * 2/(N+1.4)^2
-                                       + (1-1/mucov) * min(1,((2*mucov-1)/((N+2)^2+mucov)))))
+                              (1/mucov) * 2/(N+1.4)^2
+                              + (1-1/mucov) * min(1,((2*mucov-1)/((N+2)^2+mucov))))
   damps       <- controlParam("damps",
                               1 + 2*max(0, sqrt((mueff-1)/(N+1))-1) + cs)
-  C           <- controlParam("cov", NULL)
-  max_no_improve <- controlParam("noImprove",20)
+  C           <- controlParam("cov",NULL)
+  max_no_improve <- controlParam("noImprove", 10+ceiling(30*N/lambda))
   TolUpSigma  <- controlParam("tolUpSigma", 1e5)
 
   term_code   <- 0 # no error
   no_improve_count <- 0
-
   ## Safety checks:
   stopifnot(length(upper) == N)
   stopifnot(length(lower) == N)
@@ -86,10 +87,14 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   # best.fit <- Inf
   # best.par <- NULL
   best.fit <- fn(par, ...) * fnscale
-  best_arfit <- Inf
   best.par <- par
-  starting_sigma <- sigma
 
+  best_arfit <- Inf
+
+  best.fit_cut <- fn(par, ...) * fnscale
+  best.par_cut <- par
+
+  starting_sigma <- sigma
   ## Preallocate logging structures:
   if (log.sigma)
     sigma.log <- numeric(maxiter)
@@ -101,28 +106,29 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     pop.log <- array(0, c(N, mu, maxiter))
 
   ## Initialize dynamic (internal) strategy parameters and constants
-  pc <- rep(0.0, N)
-  ps <- rep(0.0, N)
+  # pc <- rep(0.0, N)
+  # ps <- rep(0.0, N)
+  pc <- controlParam("pc", rep(0.0, N))
+  ps <- controlParam("ps", rep(0.0, N))
+  chiN <- sqrt(N) * (1-1/(4*N)+1/(21*N^2))
   if(is.null(C)){
     B <- diag(N)
     D <- diag(N)
     BD <- B %*% D
     C <- BD %*% t(BD)
   }else{
-    # e <- eigen(C, symmetric = TRUE)
-    # if (log.eigen)
-    #   eigen.log[iter, ] <- rev(sort(e$values))
-    # if (!all(e$values >= sqrt(.Machine$double.eps) * abs(e$values[1]))) {
-    #   msg <- "Covariance matrix 'C' is numerically not positive definite."
-    #   break
-    # }
-    D <- diag(N)*C
-    D <- sqrt(D)
-    B <- diag(N)
-    # D <- diag(sqrt(e$values), length(e$values))
+    e <- eigen(C, symmetric = TRUE)
+    if (log.eigen)
+      eigen.log[iter, ] <- rev(sort(e$values))
+    if (!all(e$values >= sqrt(.Machine$double.eps) * abs(e$values[1]))) {
+      msg <- "Covariance matrix 'C' is numerically not positive definite."
+    }
+    sigma <- sigma * exp((norm(ps)/chiN - 1)*cs/damps)
+    B <- e$vectors
+    D <- diag(sqrt(e$values), length(e$values))
     BD <- B %*% D
   }
-  chiN <- sqrt(N) * (1-1/(4*N)+1/(21*N^2))
+
 
   iter <- 0L      ## Number of iterations
   counteval <- 0L ## Number of function evaluations
@@ -139,18 +145,24 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     if (!keep.best) {
       best.fit <- Inf
       best.par <- NULL
+      best.fit_cut <- Inf
+      best.par_cut <- NULL
     }
+
+
     if (log.sigma)
       sigma.log[iter] <- sigma
 
+
     ## Generate new population:
+
     arz <- matrix(rnorm(N*lambda), ncol=lambda)
     arx <- xmean + sigma * (BD %*% arz)
+
     vx <- ifelse(arx > lower, ifelse(arx < upper, arx, upper), lower)
 
     # cutoff to force feasibility # not written in Olaf Mersmann's version
-    # if(force_feasibility)
-    #   arx <- vx
+    # arx <- vx
 
     if (!is.null(nm))
       rownames(vx) <- nm
@@ -165,20 +177,23 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
       y <- apply(vx, 2, function(x) fn(x, ...) * fnscale)
     }
     counteval <- counteval + lambda
-    arfitness <- y * pen
 
+    arfitness <- y * pen
     valid <- pen <= 1
 
-    # print(any(valid))
     if (any(valid)) {
       wb <- which.min(y[valid])
-      # print(y[valid][wb])
       if (y[valid][wb] < best.fit) {
         best.fit <- y[valid][wb]
         best.par <- arx[,valid,drop=FALSE][,wb]
       }
     }
-    print(best.fit)
+    wb_cut <- which.min(y)
+    if (y[wb_cut] < best.fit_cut) {
+      best.fit_cut <- y[wb_cut]
+      best.par_cut <- vx[,wb_cut]
+    }
+
     ## Order fitness:
     arindex <- order(arfitness)
     arfitness <- arfitness[arindex]
@@ -190,19 +205,20 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     zmean <- drop(selz %*% weights)
 
     # check for arfit improvement
-
-    if(arfitness[1] < best_arfit){
+    if( arfitness[1] < best_arfit){
       best_arfit <- arfitness[1]
       no_improve_count <- 0
     }else{
       no_improve_count <- no_improve_count + 1
     }
-    message(paste0("no improvement for ",no_improve_count," last best:",best_arfit," vs ",  arfitness[1]))
 
     ## Save selected x value:
-    if (log.pop) pop.log[,,iter] <- selx
-    if (log.value) {
-      value.log[iter,] <- arfitness[aripop]
+    if(!logFeasible){
+      if (log.pop) pop.log[,,iter] <- selx
+      if (log.value) value.log[iter,] <- arfitness[aripop]
+    }else{
+      if (log.pop) pop.log[,,iter] <- vx[,aripop]
+      if (log.value) value.log[iter,] <- y[aripop]
     }
 
     ## Cumulation: Update evolutionary paths
@@ -217,26 +233,26 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
       ccov * (1-1/mucov) * BDz %*% diag(weights) %*% t(BDz)
 
     ## Adapt step size sigma:
-    # e <- eigen(C, symmetric = TRUE)
-    # if (log.eigen)
-    #   eigen.log[iter, ] <- rev(sort(e$values))
-    # if (!all(e$values >= sqrt(.Machine$double.eps) * abs(e$values[1]))) {
-    #   msg <- "Covariance matrix 'C' is numerically not positive definite."
-    #   break
-    # }
+    e <- eigen(C, symmetric = TRUE)
+    if (log.eigen)
+      eigen.log[iter, ] <- rev(sort(e$values))
+    if (!all(e$values >= sqrt(.Machine$double.eps) * abs(e$values[1]))) {
+      msg <- "Covariance matrix 'C' is numerically not positive definite."
+      break
+    }
 
     sigma <- sigma * exp((norm(ps)/chiN - 1)*cs/damps)
-    # print(sigma)
-    D <- diag(N)*C
-    D <- sqrt(D)
-    # B <- e$vectors
-    # D <- diag(sqrt(e$values), length(e$values))
+    # limiting sigma
+    if(limit_sigma)
+      if(sigma>=0.1*range) sigma <- 0.1*range
+    # D <- diag(N)*C
+    # D <- sqrt(D)
+    B <- e$vectors
+    D <- diag(sqrt(e$values), length(e$values))
     BD <- B %*% D
 
 
     ## break if fit:
-
-
     if (arfitness[1] <= stopfitness * fnscale) {
       msg <- "Stop fitness reached."
       break
@@ -279,7 +295,7 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     # }
     #
     # if(checkNoEffectCoord(xmean,sigma)){
-    #   message(sprintf("Addition of 0.2 times sigma does not change mean value."))
+    #   message(sprintf("Addition of 0.2 times sigma on any variable does not change mean value."))
     #   term_code <- 4
     #   break
     # }
@@ -302,6 +318,11 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
 
   ## Drop names from value object
   names(best.fit) <- NULL
+  if(logFeasible){
+    best.fit <- best.fit_cut
+    best.par <- best.par_cut
+  }
+
   res <- list(par=best.par,
               value=best.fit / fnscale,
               counts=cnt,
@@ -311,6 +332,8 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
               diagnostic=log,
               cov=C,
               sigma=sigma,
+              pc=pc,
+              ps=ps,
               termination_code=term_code)
   # termination codes:
   # 0: no error
@@ -321,5 +344,20 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   # 5: condition number too large
   class(res) <- "cma_es.result"
   return(res)
+}
+
+checkNoEffectAxis <-function(xmean,BD,sigma){
+ m <- xmean
+ return(sum((m - (m + 0.1 * sigma * diag(C) ))^2) <
+          .Machine$double.eps)
+}
+
+checkNoEffectCoord <-function(xmean,sigma){
+  m <- xmean
+  return(sum((m - (m + 0.2 * sigma))^2) < .Machine$double.eps)
+}
+
+checkCondNumber <- function(C){
+  return(kappa(C)>1e14)
 }
 

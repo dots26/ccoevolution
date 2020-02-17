@@ -32,7 +32,7 @@ optim_sepCMA <- function(contextVector=NULL,nVar,fun,...,
                           mu=groupSize,lambda=groupSize,
                           maxit=round((budget-nEval)/1000)-1,
                           sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
-                          diag.value=T)
+                          diag.value=T,trace=T)
     # group optimization
     best<- sep_cma_es(contextVector[groupMember],
                       fn = subfunctionCMA,
@@ -51,6 +51,7 @@ optim_sepCMA <- function(contextVector=NULL,nVar,fun,...,
         convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
       }
     }
+    print('test')
     nEval <- nEval + best$counts[1]
     if((budget-nEval)>0){ # only update if it doesnt exceed budget
       if(!is.null(best$par)){

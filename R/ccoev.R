@@ -15,7 +15,13 @@
 #' group <- differential_grouping(ncol(population),func,ctrl,o=optimum)
 #' cc(nVar = 100,fun=func,group=group,nCycle = 2,o=optimum,lbound=rep(-100,100),ubound=rep(100,100))
 #' @export
-cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_control=list(),nCycle=9,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),evalInterval=100000,...){
+cc <- function(contextVector=NULL,nVar,
+               fun,
+               budget=1000000,
+               group=NULL,grouping_control=list(),
+               nCycle=9,
+               lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),
+               evalInterval=100000,...){
   #doParallel::registerDoParallel()
   convergence_history <- NULL
   nEval <- 0
@@ -101,7 +107,7 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
 
         leftBudget <- budget - nEval
         print(c('Comp budget left:',leftBudget,budget,nEval))
-
+        print(best$value)
         if(best$value < bestObj){
           if((budget-nEval)>0){
             bestPop <- newContextVector
@@ -149,13 +155,14 @@ cc <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping_co
 
       leftBudget <- budget - nEval
       print(c('Comp budget left:',leftBudget,budget,nEval))
+      print(c( bestObj,best$value))
 
       if(best$value < bestObj){
         if((budget-nEval)>0){
           bestPop <- newContextVector
           bestObj <- best$value
           # print('Update:')
-          # print(bestObj)
+
         }else{
           break
         }

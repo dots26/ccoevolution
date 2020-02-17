@@ -19,8 +19,9 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
                  lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),
                  nLevel=4,evalInterval=100000,
                  SA_method=c('morris_mu','morris_k','rf','sobol'),
-                 keepCovariance = F){
+                 keepCovariance = F,limit_sigma=F){
 
+  ############ initialization ###############
   SA_method <- SA_method[1]
   nEval <- 0
   convergence_history <- NULL
@@ -29,6 +30,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
   groupWeight <- NULL
   #group <- NULL
 
+  ########### grouping ################
   if(is.null(group)){
     if(SA_method == 'morris_mu' || SA_method == 'morris_k') {
       r <- 20
@@ -193,6 +195,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
     totalPortion <- sum(groupPortion)
   }
 
+  ########### initialize CMAES control parameter ############
   CMAES_control <- list()
   for(groupIndex in 1:nLevel){
     groupSize <- length(group[[groupIndex]])
@@ -212,6 +215,10 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
   for(i in 1:nRepeat){
     convergence_history <- append(convergence_history,bestObj)
   }
+
+  ######### end initialization and grouping ##################
+
+  ######### begin cooperative coevloution ####################
   while((budget-nEval)>0){
     for(groupIndex in 1:length(group)) {
       groupSize <- length(group[[groupIndex]])
@@ -233,8 +240,9 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
       if(keepCovariance){
         CMAES_control[[groupIndex]]$cov <- best$cov
         CMAES_control[[groupIndex]]$sigma <- best$sigma
+        CMAES_control[[groupIndex]]$ps <- best$ps
+        CMAES_control[[groupIndex]]$pc <- best$pc
       }
-
       nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
 
       if(nlogging_this_layer>0){
@@ -265,51 +273,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
         break
       }
     }
-    # Interconnection
-    # groupMember <- 1:nVar
-    # mu<-100
-    # best <- cma_es(contextVector[groupMember],
-    #                fn = subfunctionCMA,
-    #                contextVector=contextVector,
-    #                groupMember=groupMember,
-    #                mainfun=fun,
-    #                ...,
-    #                lower = lbound,
-    #                upper=ubound,
-    #                control = list(vectorized=T,
-    #                               mu=mu,lambda=mu,
-    #                               maxit=90,
-    #                               sigma=0.3*max(ubound-lbound),
-    #                               diag.value=T))
-    # nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
-    #
-    # if(nlogging_this_layer>0){
-    #   for(i in 1:nlogging_this_layer){
-    #     nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-    #     nGeneration_to_consider <- floor(nEval_to_logging/mu)
-    #     print(nGeneration_to_consider,nlogging_this_layer)
-    #     print(best$diagnostic)
-    #     if(!is.matrix(best$diagnostic$value)){
-    #       best$diagnostic$value <- matrix(best$diagnostic$value)
-    #     }
-    #     bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
-    #     convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
-    #   }
-    # }
-    # nEval <- nEval + best$counts[1]
-    #
-    # if((budget-nEval)>0){ # only update if it doesnt exceed budget
-    #   if(!is.null(best$par)){
-    #     contextVector <- best$par
-    #     obj <- best$value
-    #     if(obj < bestObj){
-    #       bestPop <- contextVector
-    #       bestObj <- obj
-    #     }
-    #   }
-    # }else{
-    #   break
-    # }
+
     leftBudget <- budget - nEval
     print(c('Comp budget left:',leftBudget,budget,nEval))
   }

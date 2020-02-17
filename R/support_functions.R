@@ -45,7 +45,7 @@ subfunction <- function(population,contextVector,groupMember,mainfun,...){
   contextVector <- t(matrix(contextVector,nrow=nVar))
   contextVector[,groupMember] <- population
 
-  if(is.vector(population)) contextVector <- population
+#  print(contextVector)
 
   objectiveValue <- mainfun(contextVector,...)
 }

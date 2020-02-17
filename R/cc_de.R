@@ -75,7 +75,8 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
   groupSize <- length(dg$separable)
   groupMember <- dg$separable
   DE_control[[nGroup+1]]  <- list(ccm=0.5,itermax=1)
-  pop[[nGroup+1]] <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
+  if(groupSize>0)
+    pop[[nGroup+1]] <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
 
   newContextVector <- contextVector
   leftBudget <- budget - nEval
@@ -159,9 +160,9 @@ cc_de <- function(contextVector=NULL,nVar,fun,budget=1000000,group=NULL,grouping
       ## print(c('best count',best$counts[1]))
 
       leftBudget <- budget - nEval
-      print(c('Comp budget left:',leftBudget,budget,nEval))
+      #print(c('Comp budget left:',leftBudget,budget,nEval))
 
-      print(best$value)
+      #print(best$value)
 
       if(best$value < bestObj){
         if((budget-nEval)>0){

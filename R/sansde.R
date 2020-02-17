@@ -169,11 +169,8 @@ sansde <- function(fname, pop, bestmem=NULL, bestval=Inf, Lbound, Ubound,control
       index <- which(ui[,varIndex] < Lbound[varIndex])
       ui[index,varIndex] <- Lbound[varIndex] + pracma::mod((Lbound[varIndex]-ui[index,varIndex]),(Ubound[varIndex]-Lbound[varIndex]))
     }
-
     gpop <- ui
     tempval <- fname(gpop,...)
-    # tempval <- fname(gpop)
-    # tempval <- fname(gpop,rotation_matrix = rotation_matrix,permutation = permutation,o=rep(0,1000),weight=weight)
 
     used_FEs <- used_FEs + NP
 
@@ -216,7 +213,7 @@ sansde <- function(fname, pop, bestmem=NULL, bestval=Inf, Lbound, Ubound,control
 
     # val <- fname (gpop,...)
     ibest <- which.min(val)
-    bestval <- min(val)
+    best <- min(val)
     subbestmem <- pop[ibest,]
 
     if (best < bestval){

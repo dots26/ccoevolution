@@ -202,6 +202,10 @@ TSCC_DE <- function(contextVector=NULL,nVar,
                     mainfun=fun,...)
 
     dg <- cbind(dg,subgroup)
+    print('groups')
+    print(subgroup$group)
+    print('separable')
+    print(subgroup$separable)
     nEval <- nEval + subgroup$nEval
   }
   dg<- dg[,clusterOrder,drop=F]
@@ -231,7 +235,8 @@ TSCC_DE <- function(contextVector=NULL,nVar,
     DE_control[[clusterIndex]]$sep <- list(ccm=0.5,itermax=round(currentGroupPortion))
     DE_control[[clusterIndex]]$nonsep <- list()
     CMAES_control[[clusterIndex]]$nonsep <- list()
-    pop[[clusterIndex]]$sep <-  t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
+    if(groupSize>0)
+      pop[[clusterIndex]]$sep <-  t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
     pop[[clusterIndex]]$nonsep <- list()
 
     if(length(currentClusterGrouping)>0){
@@ -243,7 +248,7 @@ TSCC_DE <- function(contextVector=NULL,nVar,
                                                                    sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                                                    diag.value=T)
         DE_control[[clusterIndex]]$nonsep[[groupIndex]] <- list(ccm=0.5,itermax=round(currentGroupPortion))
-        pop[[clusterIndex]]$nonsep <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
+        pop[[clusterIndex]]$nonsep[[groupIndex]] <- t(InitializePopulationLHS(NP,groupSize,lbound[groupMember],ubound[groupMember]))
       }
     }
   }
@@ -255,7 +260,7 @@ TSCC_DE <- function(contextVector=NULL,nVar,
 
   while((budget-nEval)>0 ){
     for(clusterIndex in 1:nLevel){
-      print(paste('Optimizing Variable level',clusterIndex))
+      #print(paste('Optimizing Variable level',clusterIndex))
       cluster_member <- group[[clusterIndex]]
       currentClusterGrouping <- dg[,clusterIndex]$group
       sep <- group[[clusterIndex]][dg[,clusterIndex]$separable]
@@ -321,6 +326,7 @@ TSCC_DE <- function(contextVector=NULL,nVar,
                           control = DE_control[[clusterIndex]]$nonsep[[groupIndex]])
           pop[[clusterIndex]]$nonsep[[groupIndex]] <- best$pop
           DE_control[[clusterIndex]]$nonsep[[groupIndex]]$ccm <- best$ccm
+
           nlogging_this_layer <- floor((nEval+best$used_FEs[1])/evalInterval)-floor(nEval/evalInterval)
           if(nlogging_this_layer>0){
             for(i in 1:nlogging_this_layer){
@@ -353,6 +359,7 @@ TSCC_DE <- function(contextVector=NULL,nVar,
       }
       leftBudget <- budget - nEval
       print(c('Comp budget left:',leftBudget,budget,nEval))
+      print(bestObj)
     }
     # Interconnection
     # groupMember <- 1:nVar
