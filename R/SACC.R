@@ -28,6 +28,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
   vars <- 1:nVar
   prevLevel <- NULL
   groupWeight <- NULL
+  learning_period <- 500
   #group <- NULL
 
   ########### grouping ################
@@ -202,8 +203,9 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
     groupMember <- group[[groupIndex]]
     currentGroupPortion <- groupPortion[groupIndex]
     CMAES_control[[groupIndex]] <- list(vectorized=T,
-                                        mu=groupSize,lambda=groupSize,
-                                        maxit=round(2000*(currentGroupPortion/totalPortion)),
+                                        # mu=groupSize,lambda=groupSize,
+                                        mu=floor(4+floor(3*log(groupSize))/2),lambda=4+floor(3*log(groupSize)),
+                                        maxit=round(learning_period*(currentGroupPortion/totalPortion)),
                                         sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
                                         diag.value=T)
   }
@@ -212,19 +214,25 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
 
   leftBudget <- budget - nEval
   nRepeat <- floor(nEval/evalInterval)
-  for(i in 1:nRepeat){
-    convergence_history <- append(convergence_history,bestObj)
+  if(nRepeat>0){
+    for(i in 1:nRepeat){
+      convergence_history <- append(convergence_history,bestObj)
+    }
   }
 
   ######### end initialization and grouping ##################
 
-  ######### begin cooperative coevloution ####################
+  ######### begin cooperative coevoloution ####################
   while((budget-nEval)>0){
-    for(groupIndex in 1:length(group)) {
+    term_code_total <- 0
+    term_code_zero <- 0
+    groupIndex <- 1
+    while(groupIndex <= length(group)) {
       groupSize <- length(group[[groupIndex]])
       groupMember <- group[[groupIndex]]
       currentGroupPortion <- groupPortion[groupIndex]
-      print(paste0('optimizing group ',groupIndex,' with ',groupSize,' members, ',currentGroupPortion/totalPortion*100,'% portion'))
+      message(paste0('optimizing group ',groupIndex,' with ',groupSize,' members, ',currentGroupPortion/totalPortion*100,'% portion'))
+
       # group optimization
       # set.seed(100)
       # print(contextVector[groupMember])
@@ -237,20 +245,136 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
                     lower = lbound[groupMember],
                     upper = ubound[groupMember],
                     control = CMAES_control[[groupIndex]])
-      if(keepCovariance){
-        CMAES_control[[groupIndex]]$cov <- best$cov
-        CMAES_control[[groupIndex]]$sigma <- best$sigma
-        CMAES_control[[groupIndex]]$ps <- best$ps
-        CMAES_control[[groupIndex]]$pc <- best$pc
+
+      termination_code <- best$termination_code
+      term_code_total <- term_code_total + 1
+
+      # termination codes:
+      # 0: no error -> do nothing/update covariance matrix
+      # 1: sigma divergence -> create smaller groups
+      # 2: no improvement for some generations -> increase pop size
+      # 3: sigma is too small to have effect on covariance matrix -> increase pop size
+      # 4: sigma is too small to have effect on mean x -> increase pop size
+      # 5: condition number too large -> increase pop size
+
+      if(termination_code==0){
+        term_code_zero <- term_code_zero + 1
+        if(keepCovariance){
+          CMAES_control[[groupIndex]]$cov <- best$cov
+          CMAES_control[[groupIndex]]$sigma <- best$sigma
+          CMAES_control[[groupIndex]]$ps <- best$ps
+          CMAES_control[[groupIndex]]$pc <- best$pc
+        }
       }
+      lambda <- CMAES_control[[groupIndex]]$lambda
+      if(termination_code==1){
+        print('separating group')
+        # print(paste0('index: ', groupIndex))
+        if(groupSize>1){
+          # create smaller groups!
+          # modify group
+          original_group_index <- groupIndex
+          original_group <- group[[original_group_index]]
+          original_group_size <- length(original_group) # number of variable in the group
+          original_group_count <- length(group) # number of group in the cluster
+
+          modified_group_set <- group # make a copy to do a shift for the groups
+          coeff <- reg_coefficient[groupMember]
+          coeff_order <- order(coeff,decreasing = T)
+          first_group_indices <- coeff_order[1:round(original_group_size/2)]
+          second_group_indices <- coeff_order[(round(original_group_size/2)+1):original_group_size]
+
+          first_group <- groupMember[first_group_indices]
+          second_group <- groupMember[second_group_indices]
+
+          modified_group_set[[original_group_index]] <- first_group # top half of the group
+          modified_group_set[[original_group_index+1]] <- second_group# bottom half of the group
+
+          # create CMAES control for the new groups
+          # copy the control for current cluster
+          CMAES_control_tmp <- CMAES_control
+          CMAES_control_tmp[[original_group_index]] <- CMAES_control[[original_group_index]]
+          CMAES_control_tmp[[original_group_index+1]] <- CMAES_control[[original_group_index]]
+
+          CMAES_control_tmp[[original_group_index]]$mu <- max(c(4,round(CMAES_control_tmp[[original_group_index]]$mu/2)))
+          CMAES_control_tmp[[original_group_index+1]]$mu <- max(c(4,round(CMAES_control_tmp[[original_group_index+1]]$mu/2)))
+          CMAES_control_tmp[[original_group_index]]$lambda <- max(c(4,round(CMAES_control_tmp[[original_group_index]]$lambda/2)))
+          CMAES_control_tmp[[original_group_index+1]]$lambda <- max(c(4,round(CMAES_control_tmp[[original_group_index+1]]$lambda/2)))
+
+          # expand group portion
+          groupPortion_tmp <- groupPortion
+          groupPortion_tmp[original_group_index] <- groupPortion[original_group_index]
+          groupPortion_tmp[original_group_index+1] <- groupPortion[original_group_index]
+
+          # separate the covariance matrix, ps, and pc if exists
+          if(!is.null(CMAES_control_tmp[[original_group_index]]$cov)){
+            first_cov_size <- length(first_group_indices)
+
+            tmp_cov_matrix <- matrix(,nrow=round(original_group_size/2),ncol=round(original_group_size/2))
+            for(ii in 1:first_cov_size){
+              for(jj in 1:first_cov_size){
+                tmp_cov_matrix[ii,jj] <- CMAES_control[[original_group_index]]$cov[first_group_indices[ii],first_group_indices[jj]]
+              }
+            }
+            CMAES_control_tmp[[original_group_index]]$cov <- tmp_cov_matrix
+
+            # start_second_cov <- round(original_group_size/2)+1
+            second_cov_size <- length(second_group_indices)
+            tmp_cov_matrix <- matrix(,nrow=second_cov_size,ncol=second_cov_size)
+            for(ii in 1:second_cov_size){
+              for(jj in 1:second_cov_size){
+                tmp_cov_matrix[ii,jj] <- CMAES_control[[original_group_index]]$cov[second_group_indices[ii],second_group_indices[jj]]
+              }
+            }
+            CMAES_control_tmp[[original_group_index+1]]$cov <- tmp_cov_matrix
+
+            # separate pc
+            CMAES_control_tmp[[original_group_index]]$pc <- CMAES_control[[groupIndex]]$pc[first_group_indices]
+            CMAES_control_tmp[[original_group_index+1]]$pc <- CMAES_control[[groupIndex]]$pc[second_group_indices]
+
+            # separate ps
+            CMAES_control_tmp[[original_group_index]]$ps <- CMAES_control[[groupIndex]]$ps[first_group_indices]
+            CMAES_control_tmp[[original_group_index+1]]$ps <- CMAES_control[[groupIndex]]$ps[second_group_indices]
+          }
+
+          # shift the rest
+          if((original_group_index+1)<=original_group_count)
+          for(mod_index in (original_group_index+1):original_group_count){
+            modified_group_set[[mod_index+1]] <- group[[mod_index]]
+            CMAES_control_tmp[[mod_index+1]] <- CMAES_control[[mod_index]]
+            groupPortion_tmp[mod_index+1] <- groupPortion[mod_index]
+          }
+
+
+          # replace the grouping and control with the added group
+          group <- modified_group_set
+          CMAES_control <- CMAES_control_tmp
+          groupPortion <- groupPortion_tmp
+          # print(groupPortion)
+          groupIndex <- groupIndex+1 # a jump to skip the newly created group
+          # print(paste0('index: ', groupIndex))
+        }
+      }else if(any(termination_code==c(2,3,4,5))){
+        print('expanding population')
+        # IPOP-CMAES -> double pop size
+        CMAES_control[[groupIndex]]$mu <- 2*CMAES_control[[groupIndex]]$mu
+        CMAES_control[[groupIndex]]$lambda <- 2*CMAES_control[[groupIndex]]$lambda
+
+        #CMAES_control[[groupIndex]]$maxit <- round(CMAES_control[[groupIndex]]$maxit/2)
+        # if(any(termination_code==c(3,4))){
+        #   CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$sigma <- CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$sigma * 10
+        # }
+        # groupIndex <- groupIndex-1
+      }
+
+
       nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
 
       if(nlogging_this_layer>0){
         for(i in 1:nlogging_this_layer){
           nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/groupSize)
-          #print(nGeneration_to_consider,nlogging_this_layer)
-          #print(best$diagnostic)
+          nGeneration_to_consider <- floor(nEval_to_logging/lambda)
+
           if(!is.matrix(best$diagnostic$value)){
             best$diagnostic$value <- matrix(best$diagnostic$value)
           }
@@ -272,8 +396,26 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
       }else{
         break
       }
+      groupIndex <- groupIndex+1
+      print(bestObj)
     }
 
+    successful_termination <- term_code_zero/term_code_total
+    maxit_multiplier <- (successful_termination-0.5)/2+1
+    # if(successful_termination>0.66){ # most subproblems are successful, increase learning period
+      #learning_period <- round(learning_period*1.5)
+      message('======Extending Learning Period========')
+      for(groupIndex in 1:nLevel){
+        CMAES_control[[groupIndex]]$maxit <- ceiling(CMAES_control[[groupIndex]]$maxit*maxit_multiplier)
+      }
+    # }
+    # if(successful_termination<0.33){ # most subproblems are failing, reduce learning period
+    #   # learning_period <- round(learning_period/1.5)
+    #   message('======Reducing Learning Period========')
+    #   for(groupIndex in 1:nLevel){
+    #     CMAES_control[[groupIndex]]$maxit <- ceiling(CMAES_control[[groupIndex]]$maxit/1.5)
+    #   }
+    # }
     leftBudget <- budget - nEval
     print(c('Comp budget left:',leftBudget,budget,nEval))
   }

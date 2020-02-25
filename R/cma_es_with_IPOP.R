@@ -72,8 +72,8 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
   damps       <- controlParam("damps",
                               1 + 2*max(0, sqrt((mueff-1)/(N+1))-1) + cs)
   C           <- controlParam("cov",NULL)
-  max_no_improve <- controlParam("noImprove", 10+ceiling(30*N/lambda))
-  TolUpSigma  <- controlParam("tolUpSigma", 1e5)
+  max_no_improve <- controlParam("noImprove", 70+ceiling(30*N/lambda))
+  TolUpSigma  <- controlParam("tolUpSigma", 1e2)
 
   term_code   <- 0 # no error
   no_improve_count <- 0
@@ -183,6 +183,8 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
 
     if (any(valid)) {
       wb <- which.min(y[valid])
+      # print('wb')
+      # print(c(y[valid][wb],best.fit))
       if (y[valid][wb] < best.fit) {
         best.fit <- y[valid][wb]
         best.par <- arx[,valid,drop=FALSE][,wb]
@@ -242,6 +244,7 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
     }
 
     sigma <- sigma * exp((norm(ps)/chiN - 1)*cs/damps)
+
     # limiting sigma
     if(limit_sigma)
       if(sigma>=0.1*range) sigma <- 0.1*range
@@ -277,31 +280,38 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
                       iter, maxiter, arfitness[1] * fnscale))
 
     if(sigma>=starting_sigma*TolUpSigma){
-      message(sprintf("Sigma divergence detected! Terminating."))
-      term_code <- 1
-      break
+      if(N<=3){
+        # message(sprintf("Group size too small. Restart cancelled..."))
+      }else{
+        msg <- (sprintf("Sigma divergence detected! Restart triggered..."))
+        term_code <- 1
+        break
+      }
     }
 
     if(no_improve_count >= max_no_improve){
-      message(sprintf("No fitness improvement for %i generation. Terminating.",max_no_improve))
+      msg <-(sprintf("No fitness improvement for %i generations. Restart triggered...",max_no_improve))
       term_code <- 2
       break
     }
+    #
+    # print(c('sigma',sigma,C))
 
-    if(checkNoEffectAxis(xmean,BD,sigma)){
-      message(sprintf("Addition of 0.1 times sigma does not change mean value."))
+    if(checkNoEffectAxis(xmean,C,sigma)){
+      msg <-(sprintf("Addition of 0.1 times sigma does not change mean value. "))
       term_code <- 3
       break
     }
 
     if(checkNoEffectCoord(xmean,sigma)){
-      message(sprintf("Addition of 0.2 times sigma on any variable does not change mean value."))
+      msg <-(sprintf("Addition of 0.2 times sigma on any variable does not change mean value. Restart triggered..."))
       term_code <- 4
+      # print(c('sigma',sigma))
       break
     }
 
     if(checkCondNumber(C)){
-      message(sprintf("Cov matrix condition number exceed 1e14."))
+      msg <-(sprintf("Cov matrix condition number exceed 1e14. Restart triggered..."))
       term_code <- 5
       break
     }
@@ -346,10 +356,10 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
   return(res)
 }
 
-checkNoEffectAxis <-function(xmean,BD,sigma){
- m <- xmean
- return(sum((m - (m + 0.1 * sigma * diag(C) ))^2) <
-          .Machine$double.eps)
+checkNoEffectAxis <-function(xmean,C,sigma){
+  m <- xmean
+  return(sum((m - (m + 0.1 * sigma * diag(C) ))^2) <
+           .Machine$double.eps)
 }
 
 checkNoEffectCoord <-function(xmean,sigma){

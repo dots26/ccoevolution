@@ -13,7 +13,7 @@
 #' ctrl <- list(lbound=rep(-100,1000),ubound=rep(100,1000),delta=rep(20,1000))
 #' TSCC(nVar = 1000,fun=func,lbound=rep(-100,1000),ubound=rep(100,1000),o=optimum)
 #' @export
-TSCC <- function(contextVector=NULL,nVar,
+TSCC_old <- function(contextVector=NULL,nVar,
                  fun,...,
                  group=NULL, ## ignored
                  budget=3000000,lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),
@@ -219,6 +219,9 @@ TSCC <- function(contextVector=NULL,nVar,
       current <- groupOrder[subgroupIndex]
       subgroupOrderedBySize[[subgroupIndex]] <- subgroup[[current]]
     }
+    copy_sep <- subgroup$separable
+    subgroup$separable <- list()
+    subgroup$separable[[1]] <- copy_sep
     dg <- cbind(dg,subgroup)
     print('groups')
     print(subgroup$group)
@@ -241,13 +244,14 @@ TSCC <- function(contextVector=NULL,nVar,
   for(clusterIndex in 1:nLevel){
     cluster_member <- group[[clusterIndex]]
     currentClusterGrouping <- dg[,clusterIndex]$group
-    sep <- group[[clusterIndex]][dg[,clusterIndex]$separable]
+    sep <- group[[clusterIndex]][dg[,clusterIndex]$separable[[1]]]
     groupSize <- length(sep)
     groupMember <- sep
     currentGroupPortion <- groupPortion[clusterIndex]
 
+    CMAES_control[[clusterIndex]]$sep <- list()
     if(groupSize>0){
-      CMAES_control[[clusterIndex]]$sep <- list(vectorized=T,
+      CMAES_control[[clusterIndex]]$sep[[1]] <- list(vectorized=T,
                                                 mu=groupSize,lambda=groupSize,
                                                 maxit=round(2000*(currentGroupPortion/totalPortion)),
                                                 sigma=0.3*max(ubound[groupMember]-lbound[groupMember]),
@@ -268,8 +272,10 @@ TSCC <- function(contextVector=NULL,nVar,
   }
 
   nRepeat <- floor(nEval/evalInterval)
-  for(i in 1:nRepeat){
-    convergence_history <- append(convergence_history,bestObj)
+  if(nRepeat>0){
+    for(i in 1:nRepeat){
+      convergence_history <- append(convergence_history,bestObj)
+    }
   }
   ########### end initialization& grouping  ###############
 
@@ -302,11 +308,12 @@ TSCC <- function(contextVector=NULL,nVar,
           CMAES_control[[clusterIndex]]$sep$ps <- best$ps
           CMAES_control[[clusterIndex]]$sep$pc <- best$pc
         }
+
         nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
         if(nlogging_this_layer>0){
           for(i in 1:nlogging_this_layer){
             nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-            nGeneration_to_consider <- floor(nEval_to_logging/CMAES_control[[clusterIndex]]$sep$mu)
+            nGeneration_to_consider <- floor(nEval_to_logging/mu)
             #print(nGeneration_to_consider,nlogging_this_layer)
             #print(best$diagnostic)
             if(!is.matrix(best$diagnostic$value)){
@@ -334,7 +341,8 @@ TSCC <- function(contextVector=NULL,nVar,
       # optimize non-separable
 
       if(length(currentClusterGrouping)>0){
-        for(groupIndex in 1:length(currentClusterGrouping)) {
+        groupIndex <- 1
+        while(groupIndex <= length(currentClusterGrouping)) {
           groupMember <- cluster_member[currentClusterGrouping[[groupIndex]]]
           groupSize <- length(groupMember)
           # print(contextVector[groupMember])
@@ -348,18 +356,116 @@ TSCC <- function(contextVector=NULL,nVar,
                         upper=ubound[groupMember],
                         # control = list(mu=groupSize,lambda=groupSize,maxit=2000))
                         control = CMAES_control[[clusterIndex]]$nonsep[[groupIndex]])
-          if(keepCovariance){
-            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$cov <- best$cov
-            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$sigma <- best$sigma
-            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$ps <- best$ps
-            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$pc <- best$pc
+          termination_code <- best$termination_code
+          # termination codes:
+          # 0: no error -> do nothing
+          # 1: sigma divergence -> create smaller groups
+          # 2: no improvement for 20 generations -> increase pop size
+          # 3: sigma is too small to have effect on covariance matrix -> increase pop size
+          # 4: sigma is too small to have effect on mean x -> increase pop size
+          # 5: condition number too large -> increase pop size
+
+          if(termination_code==0){
+            if(keepCovariance){
+              CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$cov <- best$cov
+              CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$sigma <- best$sigma
+              CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$ps <- best$ps
+              CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$pc <- best$pc
+            }
+          }
+          mu <- CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$mu
+          if(termination_code==1){
+            print("separating group")
+            if(groupSize>1){
+              # create smaller groups!
+              # modify dg[,clusterIndex]$group
+              original_group_index <- groupIndex
+              original_group <- dg[,clusterIndex]$group[[original_group_index]]
+              original_group_size <- length(original_group) # number of variable in the group
+              original_group_count <- length(dg[,clusterIndex]$group) # number of group in the cluster
+
+              modified_group_set <- dg[,clusterIndex]$group # make a copy to do a shift for the groups
+              group_coef <- reg_coefficient[groupMember]
+              group_coef_order <- order(group_coef,decreasing = T)
+              first_group_indices <- group_coef_order[1:round(original_group_size/2)]
+              second_group_indices <- group_coef_order[(round(original_group_size/2)+1):original_group_size]
+
+              first_group <- groupMember[first_group_indices]
+              second_group <- groupMember[second_group_indices]
+
+              modified_group_set[[original_group_index]] <- first_group # top half of the group
+              modified_group_set[[original_group_index+1]] <- second_group# bottom half of the group
+
+              # create CMAES control for the new groups
+              # copy the control for current cluster
+              # create CMAES control for the new groups
+              # copy the control for current cluster
+              CMAES_control_tmp <- CMAES_control[[clusterIndex]]$nonsep
+              CMAES_control_tmp[[original_group_index]] <- CMAES_control[[clusterIndex]]$nonsep[[original_group_index]]
+              CMAES_control_tmp[[original_group_index+1]] <- CMAES_control[[clusterIndex]]$nonsep[[original_group_index]]
+
+              CMAES_control_tmp[[original_group_index]]$mu <-round( CMAES_control_tmp[[clusterIndex]]$nonsep[[original_group_index]]$mu/2 )
+              CMAES_control_tmp[[original_group_index+1]]$mu <- round( CMAES_control_tmp[[clusterIndex]]$nonsep[[original_group_index+1]]$mu/2 )
+              CMAES_control_tmp[[original_group_index]]$lambda <- round(CMAES_control_tmp[[clusterIndex]]$nonsep[[original_group_index]]$lambda/2)
+              CMAES_control_tmp[[original_group_index+1]]$lambda <- round(CMAES_control_tmp[[clusterIndex]]$nonsep[[original_group_index+1]]$lambda/2)
+
+              # separate the covariance matrix, ps, and pc if exists
+              if(!is.null(CMAES_control_tmp[[original_group_index]]$cov)){
+                first_cov_size <- length(first_group_indices)
+
+                tmp_cov_matrix <- matrix(,nrow=round(original_group_size/2),ncol=round(original_group_size/2))
+                for(ii in 1:first_cov_size){
+                  for(jj in 1:first_cov_size){
+                    tmp_cov_matrix[ii,jj] <- CMAES_control[[clusterIndex]]$nonsep[[original_group_index]]$cov[first_group_indices[ii],first_group_indices[jj]]
+                  }
+                }
+                CMAES_control_tmp[[original_group_index]]$cov <- tmp_cov_matrix
+
+                # start_second_cov <- round(original_group_size/2)+1
+                second_cov_size <- length(second_group_indices)
+                tmp_cov_matrix <- matrix(,nrow=second_cov_size,ncol=second_cov_size)
+                for(ii in 1:second_cov_size){
+                  for(jj in 1:second_cov_size){
+                    tmp_cov_matrix[ii,jj] <- CMAES_control[[clusterIndex]]$nonsep[[original_group_index]]$cov[second_group_indices[ii],second_group_indices[jj]]
+                  }
+                }
+                CMAES_control_tmp[[original_group_index+1]]$cov <- tmp_cov_matrix
+
+                # separate pc
+                CMAES_control_tmp[[original_group_index]]$pc <- CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$pc[first_group_indices]
+                CMAES_control_tmp[[original_group_index+1]]$pc <- CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$pc[second_group_indices]
+
+                # separate ps
+                CMAES_control_tmp[[original_group_index]]$ps <- CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$ps[first_group_indices]
+                CMAES_control_tmp[[original_group_index+1]]$ps <- CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$ps[second_group_indices]
+              }
+
+              # shift the rest
+              for(mod_index in (original_group_index+1):original_group_count){
+                modified_group_set[[mod_index+1]] <- dg[,clusterIndex]$group[[mod_index]]
+                CMAES_control_tmp[[mod_index+1]] <- CMAES_control[[clusterIndex]]$nonsep[[mod_index]]
+              }
+
+              # replace the grouping and control with the added group
+              dg[,clusterIndex]$group <- modified_group_set
+              CMAES_control[[clusterIndex]]$nonsep <- CMAES_control_tmp
+              groupIndex <- groupIndex-1 # a jump to skip the newly created group
+              currentClusterGrouping <- dg[,clusterIndex]$group # update the grouping for local function
+            }
+          }else if(any(termination_code==c(2,3,4,5))){
+            # IPOP-CMAES -> double pop size
+            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$mu <- 2*CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$mu
+            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$lambda <- 2*CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$lambda
+
+            CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$maxit <- round(CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$maxit/2)
+            groupIndex <- groupIndex-1
           }
 
           nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
           if(nlogging_this_layer>0){
             for(i in 1:nlogging_this_layer){
               nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-              nGeneration_to_consider <- floor(nEval_to_logging/CMAES_control[[clusterIndex]]$nonsep[[groupIndex]]$mu)
+              nGeneration_to_consider <- floor(nEval_to_logging/mu)
               #print(nGeneration_to_consider,nlogging_this_layer)
               #print(best$diagnostic)
               if(!is.matrix(best$diagnostic$value)){
@@ -372,12 +478,7 @@ TSCC <- function(contextVector=NULL,nVar,
           }
           nEval <- nEval + best$counts[1]
 
-          # print('curbest')
-          # print(bestPop)
-          # print(bestObj)
-          # print('new')
-          # print(best$par)
-          # print(best$value)
+
           if((budget-nEval)>0){ # only update if it doesnt exceed budget
             if(!is.null(best$par)){
               contextVector[groupMember] <- best$par
@@ -393,6 +494,7 @@ TSCC <- function(contextVector=NULL,nVar,
             break
           }
         }
+        groupIndex <- groupIndex+1
       }
       leftBudget <- budget - nEval
       print(c('Comp budget left:',leftBudget,budget,nEval))

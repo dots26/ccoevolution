@@ -4,10 +4,21 @@
 \alias{SACC}
 \title{Cooperative coevolution.}
 \usage{
-SACC(contextVector = NULL, nVar, fun, ..., group = NULL,
-  budget = 3e+06, lbound = rep(-Inf, nVar), ubound = rep(Inf, nVar),
-  nLevel = 4, evalInterval = 1e+05, SA_method = c("morris_mu",
-  "morris_k", "rf", "sobol"), keepCovariance = F)
+SACC(
+  contextVector = NULL,
+  nVar,
+  fun,
+  ...,
+  group = NULL,
+  budget = 3e+06,
+  lbound = rep(-Inf, nVar),
+  ubound = rep(Inf, nVar),
+  nLevel = 4,
+  evalInterval = 1e+05,
+  SA_method = c("morris_mu", "morris_k", "rf", "sobol"),
+  keepCovariance = F,
+  limit_sigma = F
+)
 }
 \arguments{
 \item{fun}{The objective function object to be solved}

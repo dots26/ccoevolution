@@ -70,8 +70,8 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   damps       <- controlParam("damps",
                               1 + 2*max(0, sqrt((mueff-1)/(N+1))-1) + cs)
   C           <- controlParam("cov", NULL)
-  max_no_improve <- controlParam("noImprove",20)
-  TolUpSigma  <- controlParam("tolUpSigma", 1e5)
+  max_no_improve <- controlParam("noImprove",70+ceiling(30*N/lambda))
+  TolUpSigma  <- controlParam("tolUpSigma", 1e2)
 
   term_code   <- 0 # no error
   no_improve_count <- 0
@@ -178,7 +178,6 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
         best.par <- arx[,valid,drop=FALSE][,wb]
       }
     }
-    print(best.fit)
     ## Order fitness:
     arindex <- order(arfitness)
     arfitness <- arfitness[arindex]
@@ -197,7 +196,7 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     }else{
       no_improve_count <- no_improve_count + 1
     }
-    message(paste0("no improvement for ",no_improve_count," last best:",best_arfit," vs ",  arfitness[1]))
+    # message(paste0("no improvement for ",no_improve_count," last best:",best_arfit," vs ",  arfitness[1]))
 
     ## Save selected x value:
     if (log.pop) pop.log[,,iter] <- selx
@@ -236,7 +235,6 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
 
     ## break if fit:
 
-
     if (arfitness[1] <= stopfitness * fnscale) {
       msg <- "Stop fitness reached."
       break
@@ -261,31 +259,36 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
                       iter, maxiter, arfitness[1] * fnscale))
 
     if(sigma>=starting_sigma*TolUpSigma){
-      message(sprintf("Sigma divergence detected! Terminating."))
-      term_code <- 1
-      break
+      message(sprintf("Sigma divergence detected! Restart triggered..."))
+      if(N<=3){
+        # message(sprintf("Group size too small. Restart cancelled..."))
+      }else{
+        message(sprintf("Sigma divergence detected! Restart triggered..."))
+        term_code <- 1
+        break
+      }
     }
 
     if(no_improve_count >= max_no_improve){
-      message(sprintf("No fitness improvement for %i generation. Terminating.",max_no_improve))
+      msg <- (sprintf("No fitness improvement for %i generation. Terminating.",max_no_improve))
       term_code <- 2
       break
     }
 
-    if(checkNoEffectAxis(xmean,BD,sigma)){
-      message(sprintf("Addition of 0.1 times sigma does not change mean value."))
+    if(checkNoEffectAxis(xmean,C,sigma)){
+      msg <- (sprintf("Addition of 0.1 times sigma does not change mean value."))
       term_code <- 3
       break
     }
 
     if(checkNoEffectCoord(xmean,sigma)){
-      message(sprintf("Addition of 0.2 times sigma does not change mean value."))
+      msg <- (sprintf("Addition of 0.2 times sigma does not change mean value."))
       term_code <- 4
       break
     }
 
     if(checkCondNumber(C)){
-      message(sprintf("Cov matrix condition number exceed 1e14."))
+      msg <- (sprintf("Cov matrix condition number exceed 1e14."))
       term_code <- 5
       break
     }

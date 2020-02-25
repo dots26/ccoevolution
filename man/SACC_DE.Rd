@@ -4,10 +4,19 @@
 \alias{SACC_DE}
 \title{Cooperative coevolution.}
 \usage{
-SACC_DE(contextVector = NULL, nVar, fun, ..., group = NULL,
-  budget = 3e+06, lbound = rep(-Inf, nVar), ubound = rep(Inf, nVar),
-  nLevel = 4, evalInterval = 1e+05, SA_method = c("morris_mu",
-  "morris_k", "rf", "sobol"))
+SACC_DE(
+  contextVector = NULL,
+  nVar,
+  fun,
+  ...,
+  group = NULL,
+  budget = 3e+06,
+  lbound = rep(-Inf, nVar),
+  ubound = rep(Inf, nVar),
+  nLevel = 4,
+  evalInterval = 1e+05,
+  SA_method = c("morris_mu", "morris_k", "rf", "sobol")
+)
 }
 \arguments{
 \item{fun}{The objective function object to be solved}

@@ -4,10 +4,19 @@
 \alias{TSCC_DE}
 \title{Cooperative coevolution.}
 \usage{
-TSCC_DE(contextVector = NULL, nVar, fun, ..., group = NULL,
-  budget = 3e+06, lbound = rep(-Inf, nVar), ubound = rep(Inf, nVar),
-  nLevel = 4, evalInterval = 1e+05, SA_method = c("morris_mu",
-  "morris_k", "rf", "sobol"))
+TSCC_DE(
+  contextVector = NULL,
+  nVar,
+  fun,
+  ...,
+  group = NULL,
+  budget = 3e+06,
+  lbound = rep(-Inf, nVar),
+  ubound = rep(Inf, nVar),
+  nLevel = 4,
+  evalInterval = 1e+05,
+  SA_method = c("morris_mu", "morris_k", "rf", "sobol")
+)
 }
 \arguments{
 \item{fun}{The objective function object to be solved}

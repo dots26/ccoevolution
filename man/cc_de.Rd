@@ -4,9 +4,19 @@
 \alias{cc_de}
 \title{Cooperative coevolution.}
 \usage{
-cc_de(contextVector = NULL, nVar, fun, budget = 1e+06, group = NULL,
-  grouping_control = list(), nCycle = 9, lbound = rep(-Inf, nVar),
-  ubound = rep(Inf, nVar), evalInterval = 1e+05, ...)
+cc_de(
+  contextVector = NULL,
+  nVar,
+  fun,
+  budget = 1e+06,
+  group = NULL,
+  grouping_control = list(),
+  nCycle = 9,
+  lbound = rep(-Inf, nVar),
+  ubound = rep(Inf, nVar),
+  evalInterval = 1e+05,
+  ...
+)
 }
 \arguments{
 \item{fun}{The objective function object to be solved}
