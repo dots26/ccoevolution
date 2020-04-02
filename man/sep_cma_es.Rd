@@ -2,16 +2,33 @@
 % Please edit documentation in R/sep_cmaes.R
 \name{sep_cma_es}
 \alias{sep_cma_es}
-\title{Covariance matrix adapting evolutionary strategy for separable problem}
+\title{sep-CMA-ES}
 \source{
 The code is a minor modification from cmaes::cma_es(), specialized to handle separable function
 }
 \usage{
-sep_cma_es(par, fn, ..., lower, upper, control = list())
+sep_cma_es(
+  par,
+  fn,
+  ...,
+  lower,
+  upper,
+  control = list(),
+  inputScaleFactor = rep(1, length(par)),
+  inputScaleShift = rep(0, length(par))
+)
+}
+\arguments{
+\item{par}{Initial mean value for search. Do not scale.}
+
+\item{inputScaleFactor}{Multiplier for scaling.}
+
+\item{inputScaleShift}{The shift for scaling.}
 }
 \description{
 Global optimization procedure using a covariance matrix adapting
-evolutionary strategy for separable functions.
+evolutionary strategy for separable functions. A scaling factor for inputs can be used.
+The input will be processed as: \code{(par-inputScaleShift)*inputScaleFactor}.
 }
 \references{
 <doi:10.1007/978-3-540-87700-4_30>

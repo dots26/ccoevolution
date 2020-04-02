@@ -266,6 +266,7 @@ f7cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated Schwef
   y <- y[,permutation,drop=F]
   y <- t(rotation_matrix %*% t(y))
   y <- t_osz(y)
+
   for(groupIndex in 1:nGroup){
     thisGroup <- group[[groupIndex]]
     y[,thisGroup] <- t_asy(y[,thisGroup] ,0.2)
@@ -276,7 +277,7 @@ f7cec<- function(x,o=NULL, rotation_matrix,permutation,weight){ # rotated Schwef
   for(i in 1:7){
     group_sum <- group_sum + weight[i]*f_schewefel_1_2(y[,group[[i]],drop=F])
   }
-  group_sum <- group_sum + weight[8]*f_sphere(y[,group[[8]],drop=F])
+  group_sum <- group_sum + f_sphere(y[,group[[8]],drop=F])
   res <-  (group_sum) # transposed to facilitate Morris method
   return(res)
 }

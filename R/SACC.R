@@ -1,11 +1,24 @@
-#' Main function for the cooperative coevolution MOFBVE with multilevel framework
+#' Main function for the cooperative coevolution with sensitivity-analysis-based grouping
+#' The CMA-ES is used as solver and its
+#' step size is set based on  \code{lbound} and  \code{ubound}.
+#' This means \code{lbound} and  \code{ubound}
+#' must be finite.
 #'
-#' @title Cooperative coevolution.
-#' @param population Initial population
+#' @title Cooperative coevolution with sensitivity-analysis-based grouping.
+#' @param population Initial population. Row major order.
 #' @param fun The objective function object to be solved
-#' @param group Vector of list. Each list contains a group of non-separable variables. Available method: \code{differential_grouping}.
-#' @param grouping_control Grouping parameters. The members depends on which grouping being used.
-#' @param nCycle Number of cycles to be run.
+#' @param lbound Lower bound of the decision vector. A vector with finite values.
+#' @param ubound upper bound of the decision vector. A vector with finite values.
+#' @param group Vector of list. Each list contains members of the group. If not supplied, the grouping will use the chosen SA_method.
+#' @param variable_importance A vector. Used if group is supplied. If NULL, all variables will have same portion.
+#' @param nLevel Number of level for Morris method. Used if group is not supplied
+#' @param SA_method sensitivity analysis method. It is recommended to use the morris method: \code{'morris_mu'}.
+#' Although other SA_method should not cause an error, the package is mostly tested with \code{'morris_mu'}.
+#' @param keepCovariance Set whether the covariance matrix is persistent througout the run.
+#' If false, the Cov matrix will reset to identity matrix in each cycle.
+#' @param evalInterval Interval for data logging.
+#' @param scale If \code{TRUE}, the input vector will be scaled to [0,1] for processing,
+#' otherwise the it will be in the range \code{[lbound,ubound]}
 #' @param ... Further arguments passed to \code{fun}.
 #' @examples
 #' optimum <- rep(13,1000)
@@ -14,14 +27,17 @@
 #' SACC(nVar = 1000,fun=func,lbound=rep(-100,1000),ubound=rep(100,1000),o=optimum)
 #' @export
 SACC <- function(contextVector=NULL,nVar,fun,...,
-                 group=NULL,
+                 group=NULL,variable_importance=NULL,
                  budget=3000000,
-                 lbound=rep(-Inf,nVar),ubound=rep(Inf,nVar),
+                 lbound=rep(0,nVar),ubound=rep(1,nVar),
                  nLevel=4,evalInterval=100000,
                  SA_method=c('morris_mu','morris_k','rf','sobol'),
-                 keepCovariance = F,limit_sigma=F){
-
+                 keepCovariance = T,scale=T){
   ############ initialization ###############
+
+  if(!is.null(contextVector))
+    nVar <- length(contextVector)
+
   SA_method <- SA_method[1]
   nEval <- 0
   convergence_history <- NULL
@@ -35,8 +51,10 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
   if(is.null(group)){
     if(SA_method == 'morris_mu' || SA_method == 'morris_k') {
       r <- 20
+      print(fun)
+      print(nVar)
       a <- sensitivity::morris(model=fun,
-                               factor=nVar,
+                               factors=nVar,
                                r = r,
                                design = list(type='oat',levels=8,grid.jump=4),
                                binf=lbound,
@@ -181,9 +199,6 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
       group <- append(group,list(orderedGroup))
       clusterOrder <- 1:nLevel
     }
-
-    # checkMachineLimit <- log(groupWeight/minWeight)
-    # while(is.infinite(checkMachineLimit)
     minWeight <- min(groupWeight)
     groupPortion <- vector(length=length(groupWeight))
     for(groupIndex in 1:length(groupWeight)){
@@ -194,6 +209,33 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
       }
     }
     totalPortion <- sum(groupPortion)
+  }else{
+    if(is.null(variable_importance)){
+      reg_coefficient <- rep(1,nVar) # set same coefficient for all
+    }else{
+      reg_coefficient <- variable_importance # copy from argument
+    }
+    ## determine group weight from variable importance
+    for(i in 1:nLevel){
+      groupMember <- group[[i]]
+      groupWeight <- append(groupWeight,(sum(reg_coefficient[groupMember])))
+    }
+    ## determine computational resource portion from group weight
+    groupPortion <- vector(length=length(groupWeight))
+    for(groupIndex in 1:length(groupWeight)){
+      if(log(groupWeight[groupIndex])>0){
+        groupPortion[groupIndex] <- 1 + log(groupWeight[groupIndex])
+      }else{
+        groupPortion[groupIndex] <- 1
+      }
+    }
+    totalPortion <- sum(groupPortion)
+  }
+
+  if(is.null(contextVector)){
+    contextVector <- matrix(runif(nVar)*(ubound-lbound)+lbound,nrow=1)
+    bestObj <- fun(contextVector,...)
+    nEval <- nEval + 1
   }
 
   ########### initialize CMAES control parameter ############
@@ -221,7 +263,15 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
   }
 
   ######### end initialization and grouping ##################
-
+  if(scale){
+    scaling_shift <- lbound
+    scaling_factor <- 1/(ubound-lbound)
+    ubound <- rep(1,nVar)
+    lbound <- rep(0,nVar)
+  }else{
+    scaling_shift <- rep(0,nVar)
+    scaling_factor <- rep(1,nVar)
+  }
   ######### begin cooperative coevoloution ####################
   while((budget-nEval)>0){
     term_code_total <- 0
@@ -244,7 +294,9 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
                     mainfun=fun,...,
                     lower = lbound[groupMember],
                     upper = ubound[groupMember],
-                    control = CMAES_control[[groupIndex]])
+                    control = CMAES_control[[groupIndex]],
+                    inputScaleFactor=scaling_factor[groupMember],
+                    inputScaleShift=scaling_shift[groupMember])
 
       termination_code <- best$termination_code
       term_code_total <- term_code_total + 1
@@ -267,10 +319,11 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
         }
       }
       lambda <- CMAES_control[[groupIndex]]$lambda
+      if(F){
       if(termination_code==1){
         print('separating group')
         # print(paste0('index: ', groupIndex))
-        if(groupSize>1){
+        if(groupSize>3){
           # create smaller groups!
           # modify group
           original_group_index <- groupIndex
@@ -339,11 +392,11 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
 
           # shift the rest
           if((original_group_index+1)<=original_group_count)
-          for(mod_index in (original_group_index+1):original_group_count){
-            modified_group_set[[mod_index+1]] <- group[[mod_index]]
-            CMAES_control_tmp[[mod_index+1]] <- CMAES_control[[mod_index]]
-            groupPortion_tmp[mod_index+1] <- groupPortion[mod_index]
-          }
+            for(mod_index in (original_group_index+1):original_group_count){
+              modified_group_set[[mod_index+1]] <- group[[mod_index]]
+              CMAES_control_tmp[[mod_index+1]] <- CMAES_control[[mod_index]]
+              groupPortion_tmp[mod_index+1] <- groupPortion[mod_index]
+            }
 
 
           # replace the grouping and control with the added group
@@ -366,6 +419,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
         # }
         # groupIndex <- groupIndex-1
       }
+        }
 
 
       nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
@@ -381,6 +435,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
           bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
           convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
         }
+        save(convergence_history,file='conv.Rdata')
       }
       nEval <- nEval + best$counts[1]
 
@@ -402,20 +457,11 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
 
     successful_termination <- term_code_zero/term_code_total
     maxit_multiplier <- (successful_termination-0.5)/2+1
-    # if(successful_termination>0.66){ # most subproblems are successful, increase learning period
-      #learning_period <- round(learning_period*1.5)
-      message('======Extending Learning Period========')
-      for(groupIndex in 1:nLevel){
-        CMAES_control[[groupIndex]]$maxit <- ceiling(CMAES_control[[groupIndex]]$maxit*maxit_multiplier)
-      }
-    # }
-    # if(successful_termination<0.33){ # most subproblems are failing, reduce learning period
-    #   # learning_period <- round(learning_period/1.5)
-    #   message('======Reducing Learning Period========')
-    #   for(groupIndex in 1:nLevel){
-    #     CMAES_control[[groupIndex]]$maxit <- ceiling(CMAES_control[[groupIndex]]$maxit/1.5)
-    #   }
-    # }
+    message('======Adapting Learning Period========')
+    for(groupIndex in 1:nLevel){
+      CMAES_control[[groupIndex]]$maxit <- ceiling(CMAES_control[[groupIndex]]$maxit*maxit_multiplier)
+    }
+
     leftBudget <- budget - nEval
     print(c('Comp budget left:',leftBudget,budget,nEval))
   }

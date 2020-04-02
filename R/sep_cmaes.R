@@ -2,9 +2,14 @@
 ## sep-cmaes.R - covariance matrix adapting evolutionary strategy for separable problem
 ##
 ##' Global optimization procedure using a covariance matrix adapting
-##' evolutionary strategy for separable functions.
+##' evolutionary strategy for separable functions. A scaling factor for inputs can be used.
+##' The input will be processed as: \code{(par-inputScaleShift)*inputScaleFactor}.
 ##'
+##' @title sep-CMA-ES
 ##' @source The code is a minor modification from cmaes::cma_es(), specialized to handle separable function
+##' @param par Initial mean value for search. Do not scale.
+##' @param inputScaleFactor Multiplier for scaling.
+##' @param inputScaleShift The shift for scaling.
 ##'
 ##' @seealso \code{\link[cmaes]{cma_es}}
 ##'
@@ -12,7 +17,8 @@
 ##'
 ##' @title Covariance matrix adapting evolutionary strategy for separable problem
 ##' @export
-sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
+sep_cma_es <- function(par, fn, ..., lower, upper, control=list(),
+                       inputScaleFactor=rep(1,length(par)),inputScaleShift=rep(0,length(par))) {
   norm <- function(x)
     drop(sqrt(crossprod(x)))
 
@@ -25,7 +31,7 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   }
 
   ## Initial solution:
-  xmean <- drop(par)
+  xmean <- drop((par-inputScaleShift)*inputScaleFactor)
   N <- length(xmean)
   ## Box constraints:
   if (missing(lower))
@@ -85,9 +91,13 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
   ## Bookkeeping variables for the best solution found so far:
   # best.fit <- Inf
   # best.par <- NULL
-  best.fit <- fn(par, ...) * fnscale
   best_arfit <- Inf
-  best.par <- par
+
+  best.par <- (par-inputScaleShift)*inputScaleFactor
+  # best.par_cut <- (par-inputScaleShift)*inputScaleFactor
+  best.fit <- fn(best.par/inputScaleFactor+inputScaleShift, ...) * fnscale
+  # best.fit_cut <- fn(best.par/inputScaleFactor+inputScaleShift, ...) * fnscale
+
   starting_sigma <- sigma
 
   ## Preallocate logging structures:
@@ -160,9 +170,9 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
     cviol <- cviol + sum(pen > 1)
 
     if (vectorized) {
-      y <- fn(vx, ...) * fnscale
+      y <- fn(vx/inputScaleFactor+inputScaleShift, ...) * fnscale
     } else {
-      y <- apply(vx, 2, function(x) fn(x, ...) * fnscale)
+      y <- apply(vx/inputScaleFactor+inputScaleShift, 2, function(x) fn(x, ...) * fnscale)
     }
     counteval <- counteval + lambda
     arfitness <- y * pen
@@ -305,7 +315,7 @@ sep_cma_es <- function(par, fn, ..., lower, upper, control=list()) {
 
   ## Drop names from value object
   names(best.fit) <- NULL
-  res <- list(par=best.par,
+  res <- list(par=best.par/inputScaleFactor+inputScaleShift,
               value=best.fit / fnscale,
               counts=cnt,
               convergence=ifelse(iter >= maxiter, 1L, 0L),

@@ -2,9 +2,9 @@
 % Please edit documentation in R/cma_es_with_IPOP.R
 \name{cma_es}
 \alias{cma_es}
-\title{Covariance matrix adapting evolutionary strategy for separable problem}
+\title{CMA-ES}
 \source{
-The code is a minor modification from cmaes::cma_es(), adding cutoff on the box constraint. (line 128)
+The code is a modification from cmaes::cma_es()
 }
 \usage{
 cma_es(
@@ -14,13 +14,22 @@ cma_es(
   lower,
   upper,
   control = list(),
-  logFeasible = F,
-  limit_sigma = F
+  inputScaleFactor = rep(1, length(par)),
+  inputScaleShift = rep(0, length(par)),
+  repair = F
 )
+}
+\arguments{
+\item{par}{Initial mean value for search. Do not scale.}
+
+\item{inputScaleFactor}{Multiplier for scaling.}
+
+\item{inputScaleShift}{The shift for scaling.}
 }
 \description{
 Global optimization procedure using a covariance matrix adapting
-evolutionary strategy for separable functions.
+evolutionary strategy. A scaling factor for inputs can be used.
+The input will be processed as: \code{(par-inputScaleShift)*inputScaleFactor}.
 }
 \seealso{
 \code{\link[cmaes]{cma_es}}

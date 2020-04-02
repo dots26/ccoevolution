@@ -1,16 +1,23 @@
 ##
-## sep-cmaes.R - covariance matrix adapting evolutionary strategy for separable problem
+##  cmaes.R - covariance matrix adapting evolutionary strategy
 ##
 ##' Global optimization procedure using a covariance matrix adapting
-##' evolutionary strategy for separable functions.
+##' evolutionary strategy. A scaling factor for inputs can be used.
+##' The input will be processed as: \code{(par-inputScaleShift)*inputScaleFactor}.
 ##'
-##' @source The code is a minor modification from cmaes::cma_es(), adding cutoff on the box constraint. (line 128)
+##' @title CMA-ES
+##' @source The code is a modification from cmaes::cma_es()
 ##'
+##' @param par Initial mean value for search. Do not scale.
+##' @param inputScaleFactor Multiplier for scaling.
+##' @param inputScaleShift The shift for scaling.
 ##' @seealso \code{\link[cmaes]{cma_es}}
 ##'
 ##' @title Covariance matrix adapting evolutionary strategy for separable problem
 ##' @export
-cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,limit_sigma=F) {
+cma_es <- function(par, fn, ..., lower, upper, control=list(),
+                   inputScaleFactor=rep(1,length(par)),inputScaleShift=rep(0,length(par)),
+                   repair=F) {
   norm <- function(x)
     drop(sqrt(crossprod(x)))
 
@@ -25,7 +32,10 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
   }
 
   ## Initial solution:
-  xmean <- drop(par)
+  # print(c('inserted par:',par))
+  xmean <- drop((par-inputScaleShift)*inputScaleFactor)
+  # print(c('scaled:',xmean))
+
   N <- length(xmean)
   ## Box constraints:
   if (missing(lower))
@@ -75,6 +85,7 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
   max_no_improve <- controlParam("noImprove", 70+ceiling(30*N/lambda))
   TolUpSigma  <- controlParam("tolUpSigma", 1e2)
 
+
   term_code   <- 0 # no error
   no_improve_count <- 0
   ## Safety checks:
@@ -86,13 +97,13 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
   ## Bookkeeping variables for the best solution found so far:
   # best.fit <- Inf
   # best.par <- NULL
-  best.fit <- fn(par, ...) * fnscale
-  best.par <- par
-
   best_arfit <- Inf
 
-  best.fit_cut <- fn(par, ...) * fnscale
-  best.par_cut <- par
+  best.par <- (par-inputScaleShift)*inputScaleFactor
+  best.par_cut <- best.par
+  best.fit <- fn(best.par/inputScaleFactor+inputScaleShift, ...) * fnscale
+  best.fit_cut <- best.fit
+
 
   starting_sigma <- sigma
   ## Preallocate logging structures:
@@ -161,6 +172,8 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
 
     vx <- ifelse(arx > lower, ifelse(arx < upper, arx, upper), lower)
 
+    # print('arx')
+    # print(arx )
     # cutoff to force feasibility # not written in Olaf Mersmann's version
     # arx <- vx
 
@@ -172,22 +185,29 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
     cviol <- cviol + sum(pen > 1)
 
     if (vectorized) {
-      y <- fn(vx, ...) * fnscale
+      y <- fn(vx/inputScaleFactor+inputScaleShift, ...) * fnscale
     } else {
-      y <- apply(vx, 2, function(x) fn(x, ...) * fnscale)
+      y <- apply(vx/inputScaleFactor+inputScaleShift, 2, function(x) fn(x, ...) * fnscale)
     }
     counteval <- counteval + lambda
 
-    arfitness <- y * pen
+
+    if(!repair)
+      arfitness <- (y * pen * (y>=0) - 1/y*pen*(y<0))*(pen>1) + y*(pen<=1)
+    if(repair)
+      arfitness <-  y
+      # print(arfitness)
+
     valid <- pen <= 1
+
 
     if (any(valid)) {
       wb <- which.min(y[valid])
-      # print('wb')
-      # print(c(y[valid][wb],best.fit))
       if (y[valid][wb] < best.fit) {
         best.fit <- y[valid][wb]
         best.par <- arx[,valid,drop=FALSE][,wb]
+        # print('cmp gen')
+        # print(cbind(best.par,(par-inputScaleShift)*inputScaleFactor))
       }
     }
     wb_cut <- which.min(y)
@@ -215,7 +235,7 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
     }
 
     ## Save selected x value:
-    if(!logFeasible){
+    if(!repair){
       if (log.pop) pop.log[,,iter] <- selx
       if (log.value) value.log[iter,] <- arfitness[aripop]
     }else{
@@ -246,8 +266,8 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
     sigma <- sigma * exp((norm(ps)/chiN - 1)*cs/damps)
 
     # limiting sigma
-    if(limit_sigma)
-      if(sigma>=0.1*range) sigma <- 0.1*range
+    # if(limit_sigma)
+    #   if(sigma>=0.1*range) sigma <- 0.1*range
     # D <- diag(N)*C
     # D <- sqrt(D)
     B <- e$vectors
@@ -257,7 +277,7 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
 
     ## break if fit:
     if (arfitness[1] <= stopfitness * fnscale) {
-      msg <- "Stop fitness reached."
+      message ("Stop fitness reached.")
       break
     }
 
@@ -265,7 +285,7 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
 
     ## Condition 1 (sd < tolx in all directions):
     if (all(D < sc_tolx) && all(sigma * pc < sc_tolx)) {
-      msg <- "All standard deviations smaller than tolerance."
+      message( "All standard deviations smaller than tolerance.")
       break
     }
 
@@ -279,18 +299,20 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
       message(sprintf("Iteration %i of %i: current fitness %f",
                       iter, maxiter, arfitness[1] * fnscale))
 
+    # print('sigmas')
+    # print(sigma)
     if(sigma>=starting_sigma*TolUpSigma){
       if(N<=3){
         # message(sprintf("Group size too small. Restart cancelled..."))
       }else{
-        msg <- (sprintf("Sigma divergence detected! Restart triggered..."))
+        message (sprintf("Sigma divergence detected! Restart triggered..."))
         term_code <- 1
         break
       }
     }
 
     if(no_improve_count >= max_no_improve){
-      msg <-(sprintf("No fitness improvement for %i generations. Restart triggered...",max_no_improve))
+      message(sprintf("No fitness improvement for %i generations. Restart triggered...",max_no_improve))
       term_code <- 2
       break
     }
@@ -298,20 +320,19 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
     # print(c('sigma',sigma,C))
 
     if(checkNoEffectAxis(xmean,C,sigma)){
-      msg <-(sprintf("Addition of 0.1 times sigma does not change mean value. "))
+      message(sprintf("Addition of 0.1 times sigma does not change mean value. "))
       term_code <- 3
       break
     }
 
     if(checkNoEffectCoord(xmean,sigma)){
-      msg <-(sprintf("Addition of 0.2 times sigma on any variable does not change mean value. Restart triggered..."))
+      message(sprintf("Addition of 0.2 times sigma on any variable does not change mean value. Restart triggered..."))
       term_code <- 4
-      # print(c('sigma',sigma))
       break
     }
 
     if(checkCondNumber(C)){
-      msg <-(sprintf("Cov matrix condition number exceed 1e14. Restart triggered..."))
+      message(sprintf("Cov matrix condition number exceed 1e14. Restart triggered..."))
       term_code <- 5
       break
     }
@@ -328,12 +349,16 @@ cma_es <- function(par, fn, ..., lower, upper, control=list(), logFeasible=F,lim
 
   ## Drop names from value object
   names(best.fit) <- NULL
-  if(logFeasible){
+  if(repair){
     best.fit <- best.fit_cut
     best.par <- best.par_cut
   }
-
-  res <- list(par=best.par,
+# if(term_code!=0)
+  # message('early termination')
+  # print(c('unscaled',best.par/inputScaleFactor+inputScaleShift))
+  # print('compare par')
+  # print(cbind(best.par,(par-inputScaleShift)*inputScaleFactor))
+  res <- list(par=best.par/inputScaleFactor+inputScaleShift,
               value=best.fit / fnscale,
               counts=cnt,
               convergence=ifelse(iter >= maxiter, 1L, 0L),
@@ -370,4 +395,3 @@ checkNoEffectCoord <-function(xmean,sigma){
 checkCondNumber <- function(C){
   return(kappa(C)>1e14)
 }
-

@@ -4,11 +4,23 @@
 \alias{ML_LSGO}
 \title{Cooperative coevolution.}
 \usage{
-ML_LSGO(nVar, fun, ..., group = NULL, budget = 3e+06, lbound = NULL,
-  ubound = NULL, nLevel = 4, evalInterval = 1e+05,
+ML_LSGO(
+  nVar,
+  fun,
+  ...,
+  group = NULL,
+  variable_importance = NULL,
+  budget = 3e+06,
+  lbound = NULL,
+  ubound = NULL,
+  nLevel = 4,
+  eval_interval = 1e+05,
   SA_method = c("morris_mu", "morris_k", "rf", "sobol"),
-  maxSeqIter = 0, fname_prefix = "datalogf1_", infill = c("best",
-  "ei"), NP = NULL, mode = "optim")
+  maxSeqIter = 0,
+  fname_prefix = "datalogf1_",
+  infill = c("best", "ei"),
+  mode = "optim"
+)
 }
 \arguments{
 \item{fun}{The objective function object to be solved}
@@ -24,7 +36,7 @@ ML_LSGO(nVar, fun, ..., group = NULL, budget = 3e+06, lbound = NULL,
 \item{nCycle}{Number of cycles to be run.}
 }
 \description{
-Main function for the cooperative coevolution with multilevel framework
+Main function for the cooperative coevolution with multilevel framework.
 }
 \examples{
 optimum <- rep(13,1000)

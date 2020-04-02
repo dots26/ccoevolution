@@ -1,73 +1,93 @@
-EvaluateLowerLevel_bilevel <- function(fun,currentVector,
-                                       nextGroup,
-                                       controlNext,
+EvaluateLowerLevel_bilevel <- function(contextVector,fun,
+                                       group,
                                        lbound,ubound,
-                                       prevnEval=0,eval_interval=100000,
-                                       maxIter=300,fname_prefix="datalog_",
-                                       bestval=Inf,
+                                       eval_interval = 100000,
+                                       levelIndex,
                                        ...){
-  optimPar <- currentVector[nextGroup]
-  optimVal <- bestval
+  control <- CMAES_control[[levelIndex]]
+  prevEval <- nEval
+
+  optimPar <- contextVector[group]
+  optimVal <- fun(contextVector,...)
 
   funVal <- cma_es(fn=subfunctionCMA,
-                   contextVector=currentVector,
+                   contextVector=contextVector,
                    ...,
-                   par=currentVector[nextGroup],
-                   lower=lbound[nextGroup],
-                   upper=ubound[nextGroup],
+                   par=optimPar,
+                   lower=lbound,
+                   upper=ubound,
                    mainfun=fun,
-                   groupMember=nextGroup,
-                   logFeasible=T,
-                   control=list(maxit=maxIter,vectorized=T,mu=2,lambda=5,
-                                sigma=0.3*max(ubound[nextGroup]-lbound[nextGroup])))
-  prevnEval <- nEval
+                   groupMember=group,
+                   control=control)
+  termination_code <- funVal$termination_code
+
+  control$vectorized <- F
+  control$sigma <- funVal$sigma
+  control$cov <- funVal$cov
+  control$pc <- funVal$pc
+  control$ps <- funVal$ps
+
+  # CMAES_control[[levelIndex]] <<- control
+
+  groupIndex <- levelIndex
+
   nEval <<- nEval + funVal$counts[1]
 
   if(funVal$value<optimVal){
     optimVal <- funVal$value
     optimPar <- funVal$par
   }
-  if(funVal$value<gb){
-    gb <<- funVal$value
-    cv <<- currentVector
-    cv[nextGroup] <<- optimPar
-    print(paste('result',gb))
-  }
 
-  previousLogged <- prevnEval%/%eval_interval
-  #
+  previousLogged <- prevEval%/%eval_interval
+
   logData <- ((nEval)%/%eval_interval)-previousLogged
   if(logData){
     argList <- list(...)
     print(paste('nlog',previousLogged+1))
-    save(optimVal,optimPar,cv,gb,argList,file=paste0(fname_prefix,previousLogged+1,'.Rdata'))
+    save(optimVal,optimPar,cv,argList,file=paste0('datalog',previousLogged+1,'.Rdata'))
   }
-
-  return(list(par=optimPar,value=optimVal))
+  return(list(lowerPar=optimPar,value=optimVal,newControl=control))
 }
 
 
-EvaluateUpperLevel_bilevel <- function(upperVector,upperGroup,fun,#currentVector,
-                                       nextGroup,
-                                       controlNext,
+EvaluateUpperLevel_bilevel <- function(x,fun,
+                                       upperGroup,
+                                       lowerGroup,
+                                       levelIndex,
                                        lbound,ubound,
                                        prevnEval=0,eval_interval=100000,
-                                       maxIter=300,fname_prefix="datalog_",
-                                       bestval=Inf,
+                                       fname_prefix="datalog_",
                                        ...){
-  currentVector <- cv
-  currentVector[upperGroup] <- upperVector
-  funValue <- EvaluateLowerLevel_bilevel(fun=fun,
-                                         currentVector=currentVector,
-                                         nextGroup=nextGroup,
-                                         lbound=lbound,
-                                         ubound=ubound,
-                                         prevnEval = prevnEval,
-                                         eval_interval=eval_interval,bestval=bestval,
-                                         maxIter=maxIter,
-                                         fname_prefix=fname_prefix,
-                                         ...)
+  if((any(x>ubound))){
+    message('constraint violated - ubound')
+  }else if((any(x<lbound))){
+    message('constraint violated - lbound')
+  }
+
+  cv_x <- cv # copy the context vector
+  cv_x[upperGroup] <- x # replace the upper group with the current x values.
+
+  # get the objective value by optimizing the lower level
+  res <- EvaluateLowerLevel_bilevel(contextVector = cv_x,
+                                    fun=fun,
+                                    group=lowerGroup,
+                                    lbound=lbound[lowerGroup],
+                                    ubound=ubound[lowerGroup],
+                                    levelIndex = levelIndex+1,
+                                    ...)
 
 
-  return(funValue$value)
+  if(res$value < bestval_lower){
+    print(paste('lower level optimized:',res$value))
+    print(nEval)
+    history$nEval <<- append(history$nEval ,nEval)
+    history$conv <<- append(history$conv ,res$value)
+    save(history,file='history_MLLSGO_1000rep_diffrule_10lev_diff_lambda_swaporder.Rdata')
+
+    bestval_lower <<- res$value
+    cv[lowerGroup] <<- res$lowerPar
+    CMAES_control[[levelIndex+1]] <<- res$newControl
+  }
+  # res$value is the optimum value for the current level, subject to the optimum lower level
+  return(res$value)
 }
