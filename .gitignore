@@ -8,5 +8,3 @@ Rplots.pdf
 *.png
 log*
 *.mat
-R/sup_bilevel/*
-R/suppresed*
