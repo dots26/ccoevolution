@@ -2,9 +2,9 @@
 .Rhistory
 .RData
 .Ruserdata
-test_fun/
-History
+test_fun/*
+History*
 Rplots.pdf
-.png
-log
-.mat
+*.png
+log*
+*.mat
