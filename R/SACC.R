@@ -32,11 +32,16 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
                  lbound=rep(0,nVar),ubound=rep(1,nVar),
                  nLevel=4,evalInterval=100000,
                  SA_method=c('morris_mu','morris_k','rf','sobol'),
-                 keepCovariance = T,scale=T){
+                 keepCovariance = T,scale=F,disableIPOP=F){
   ############ initialization ###############
+  recordConv <- NULL
+  recordNEval <- NULL
 
   if(!is.null(contextVector))
     nVar <- length(contextVector)
+
+  lbound <- c(lbound)
+  ubound <- c(ubound)
 
   SA_method <- SA_method[1]
   nEval <- 0
@@ -44,22 +49,21 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
   vars <- 1:nVar
   prevLevel <- NULL
   groupWeight <- NULL
-  learning_period <- 500
+  learning_period <- 2000
   #group <- NULL
 
   ########### grouping ################
   if(is.null(group)){
+    set.seed(1000)
     if(SA_method == 'morris_mu' || SA_method == 'morris_k') {
       r <- 20
-      print(fun)
-      print(nVar)
       a <- sensitivity::morris(model=fun,
                                factors=nVar,
                                r = r,
                                design = list(type='oat',levels=8,grid.jump=4),
                                binf=lbound,
                                bsup=ubound,
-                               scale=F,...)
+                               scale=T,...)
 
       bestPopIndex <- which.min(a$y)
       bestPop <- a$X[bestPopIndex,]
@@ -67,7 +71,6 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
 
       contextVector <- bestPop
       nEval <- nEval + r*(nVar+1)
-      save(a,file='ee.Rdata')
       mu.star <- apply(a$ee, 2, function(a) mean(abs(a)))
       sigma <- apply(a$ee, 2, sd)
 
@@ -102,6 +105,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
           group <- append(group,list(orderedGroup))
           groupWeight <- append(groupWeight,sum(reg_coefficient[orderedGroup]))
         }
+
         start <- (nLevel-1)*nLevelVar+1
         end <- nVar
         unorderedCurrentGroup <- rankedVars[start:end]
@@ -109,6 +113,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
         groupWeight <- append(groupWeight,sum(reg_coefficient[orderedGroup]))
         group <- append(group,list(orderedGroup))
         clusterOrder <- 1:nLevel
+        save(reg_coefficient,a,ranks,unorderedCurrentGroup,orderedGroup,groupWeight,file='rc1.Rdata')
       }
     }
     if(SA_method == 'rf') {
@@ -220,7 +225,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
       groupMember <- group[[i]]
       groupWeight <- append(groupWeight,(sum(reg_coefficient[groupMember])))
     }
-    ## determine computational resource portion from group weight
+    ## determine computatgional resource portion from group weight
     groupPortion <- vector(length=length(groupWeight))
     for(groupIndex in 1:length(groupWeight)){
       if(log(groupWeight[groupIndex])>0){
@@ -232,6 +237,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
     totalPortion <- sum(groupPortion)
   }
 
+  print(group)
   if(is.null(contextVector)){
     contextVector <- matrix(runif(nVar)*(ubound-lbound)+lbound,nrow=1)
     bestObj <- fun(contextVector,...)
@@ -273,10 +279,12 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
     scaling_factor <- rep(1,nVar)
   }
   ######### begin cooperative coevoloution ####################
+  term_code10 <- 0
   while((budget-nEval)>0){
     term_code_total <- 0
     term_code_zero <- 0
     groupIndex <- 1
+
     while(groupIndex <= length(group)) {
       groupSize <- length(group[[groupIndex]])
       groupMember <- group[[groupIndex]]
@@ -284,9 +292,6 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
       message(paste0('optimizing group ',groupIndex,' with ',groupSize,' members, ',currentGroupPortion/totalPortion*100,'% portion'))
 
       # group optimization
-      # set.seed(100)
-      # print(contextVector[groupMember])
-      # print(groupMember)
       best<- cma_es(contextVector[groupMember],
                     fn = subfunctionCMA,
                     contextVector = contextVector,
@@ -296,11 +301,12 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
                     upper = ubound[groupMember],
                     control = CMAES_control[[groupIndex]],
                     inputScaleFactor=scaling_factor[groupMember],
-                    inputScaleShift=scaling_shift[groupMember])
+                    inputScaleShift=scaling_shift[groupMember],
+                    disableIPOP=disableIPOP)
 
       termination_code <- best$termination_code
       term_code_total <- term_code_total + 1
-
+      print(paste('term',termination_code))
       # termination codes:
       # 0: no error -> do nothing/update covariance matrix
       # 1: sigma divergence -> create smaller groups
@@ -314,15 +320,17 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
         if(keepCovariance){
           CMAES_control[[groupIndex]]$cov <- best$cov
           CMAES_control[[groupIndex]]$sigma <- best$sigma
-          CMAES_control[[groupIndex]]$ps <- best$ps
+          CMAES_control[[groupIndex]]$ps <-  best$ps
           CMAES_control[[groupIndex]]$pc <- best$pc
         }
       }
       lambda <- CMAES_control[[groupIndex]]$lambda
-      if(F){
+
+      if(termination_code==10)
+        term_code10 <- term_code10 + 1
+
       if(termination_code==1){
         print('separating group')
-        # print(paste0('index: ', groupIndex))
         if(groupSize>3){
           # create smaller groups!
           # modify group
@@ -419,24 +427,7 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
         # }
         # groupIndex <- groupIndex-1
       }
-        }
 
-
-      nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
-
-      if(nlogging_this_layer>0){
-        for(i in 1:nlogging_this_layer){
-          nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-          nGeneration_to_consider <- floor(nEval_to_logging/lambda)
-
-          if(!is.matrix(best$diagnostic$value)){
-            best$diagnostic$value <- matrix(best$diagnostic$value)
-          }
-          bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
-          convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
-        }
-        save(convergence_history,file='conv.Rdata')
-      }
       nEval <- nEval + best$counts[1]
 
       if((budget-nEval)>0){ # only update if it doesnt exceed budget
@@ -446,6 +437,8 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
           if(obj < bestObj){
             bestPop <- contextVector
             bestObj <- obj
+            recordNEval <- append(recordNEval,nEval)
+            recordConv <- append(recordConv,bestObj)
           }
         }
       }else{
@@ -453,17 +446,27 @@ SACC <- function(contextVector=NULL,nVar,fun,...,
       }
       groupIndex <- groupIndex+1
       print(bestObj)
+      print(nEval)
     }
 
-    successful_termination <- term_code_zero/term_code_total
-    maxit_multiplier <- (successful_termination-0.5)/2+1
-    message('======Adapting Learning Period========')
-    for(groupIndex in 1:nLevel){
-      CMAES_control[[groupIndex]]$maxit <- ceiling(CMAES_control[[groupIndex]]$maxit*maxit_multiplier)
-    }
+    # successful_termination <- term_code_zero/term_code_total
+    # maxit_multiplier <- (successful_termination-0.5)/2+1
+    # message('======Adapting Learning Period========')
+    # for(groupIndex in 1:nLevel){
+    #   CMAES_control[[groupIndex]]$maxit <- ceiling(CMAES_control[[groupIndex]]$maxit*maxit_multiplier)
+    # }
 
     leftBudget <- budget - nEval
     print(c('Comp budget left:',leftBudget,budget,nEval))
+    # print(paste('term10:',term_code10))
+    if(term_code10==nLevel){
+      message("Standard deviations on all groups are smaller than tolerance. Terminating...")
+      break
+    }
+    if(reticulate::py$problem$final_target_hit)
+      break
+    term_code10 <- 0
   }
-  return(list(x=bestPop,y=bestObj,conv=convergence_history))
+  return(list(x=bestPop,y=bestObj,record=list(nEval=recordNEval,conv=recordConv)))
 }
+

@@ -1,0 +1,16 @@
+.GlobalEnv
+package:randomForest
+package:ccoevolution2
+package:doParallel
+package:iterators
+package:parallel
+package:foreach
+tools:rstudio
+package:stats
+package:graphics
+package:grDevices
+package:utils
+package:datasets
+package:methods
+Autoloads
+package:base

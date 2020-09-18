@@ -212,7 +212,9 @@ DG <- function(nVar,fun,control=list(),...){
 #'         \code{group} Lists of the groups found by DG2
 #'         \code{separable} Vector of the separable variables found by DG2
 #'         \code{DSM} The full design structure matrix indicating the interaction graph.
-#'         \code{nEval} number of evaluation used in grouping
+#'         \code{nEval} Number of evaluation used in grouping
+#'         \code{x} Points evaluated
+#'         \code{y} Objective value wrt x, i.e. f(x). If multiobjective, each column is an objective, each row is for an individual
 #' @examples
 #' control <- list(lbound=rep(-100,100),ubound=rep(100,100),delta=0.1)
 #' groups <- DG2(nVar=100,f1cec,control,o=rep(13,100))
@@ -225,6 +227,8 @@ DG2 <- function(nVar,fun,control=list(),...){
     nEval <- 0
     DSM <- as.matrix(1)
   }else{
+    x <- NULL
+    y <- NULL
     con <- list(lbound=rep(0,nVar),
                 ubound=rep(1,nVar),
                 delta=NULL)
@@ -253,14 +257,20 @@ DG2 <- function(nVar,fun,control=list(),...){
     p1 <- con$lbound
     fun1 <- fun(p1,...)
 
+    x <- rbind(x,p1)
+    y <- rbind(y,fun1)
     p2_a <- t(matrix(rep(p1,nVar),ncol=nVar))
     diag(p2_a) <- center
     # vectorized, not working on ubuntu
     # fun_repeat <- fun(p2_a,...)
+    x <- rbind(x,p2_a)
 
     fun_repeat <- vector()
     for(i in 1:nrow(p2_a))
       fun_repeat[i] <- fun(p2_a[i,],...)
+
+    y <- rbind(y,fun_repeat)
+
 
     nEval <- 1+nVar
     funj <- list()
@@ -270,9 +280,12 @@ DG2 <- function(nVar,fun,control=list(),...){
       for(ix in 1:nrow(p2)){
         p2[ix,ix+i] <- center[ix+i]
       }
+      x <- rbind(x,p2)
       funj_this <- vector()
       for(i_this in 1:nrow(p2))
         funj_this[i_this] <- fun(p2[i_this,],...)
+      y <- rbind(y,funj_this)
+
       # vectorized, not working on ubuntu
       # funj <- append(funj,list(fun(p2,...)))
       funj <- append(funj,list(funj_this))
@@ -367,7 +380,7 @@ DG2 <- function(nVar,fun,control=list(),...){
       }
     }
   }
-  return(list(group=group,separable=separable,DSM=DSM,nEval = nEval))
+  return(list(group=group,separable=separable,DSM=DSM,nEval = nEval,x=x,y=y))
 }
 
 

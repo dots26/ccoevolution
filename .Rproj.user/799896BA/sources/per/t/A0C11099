@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1588790614470.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "1469099787",
+    "id" : "A0C11099",
+    "lastKnownWriteTime" : 1588775502,
+    "last_content_update" : 1588775502,
+    "path" : "/Volumes/Macintosh HD - Data/Users/Dani/sciebo/SPOTSeven.d/Drittmittelprojekte.d/Utopiae.d/Irawan/bbob/coco/run_bbob_ls.R",
+    "project_path" : null,
+    "properties" : {
+        "cursorPosition" : "5,19",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 1,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_source"
+}

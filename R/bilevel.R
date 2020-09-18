@@ -18,7 +18,7 @@ EvaluateLowerLevel_bilevel <- function(contextVector,fun,
                    upper=ubound,
                    mainfun=fun,
                    groupMember=group,
-                   control=control)
+                   control=control,disableIPOP=T)
   termination_code <- funVal$termination_code
 
   control$vectorized <- F
@@ -80,9 +80,10 @@ EvaluateUpperLevel_bilevel <- function(x,fun,
   if(res$value < bestval_lower){
     print(paste('lower level optimized:',res$value))
     print(nEval)
-    history$nEval <<- append(history$nEval ,nEval)
-    history$conv <<- append(history$conv ,res$value)
-    save(history,file='history_MLLSGO_1000rep_diffrule_10lev_diff_lambda_swaporder.Rdata')
+    record$nEval <<- append(record$nEval ,nEval)
+    record$conv <<- append(record$conv ,res$value)
+
+    save(history,res,cv_x,file='history_MLLSGO_4group_BLCMA.Rdata')
 
     bestval_lower <<- res$value
     cv[lowerGroup] <<- res$lowerPar

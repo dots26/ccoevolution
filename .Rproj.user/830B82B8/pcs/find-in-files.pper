@@ -1,0 +1,10 @@
+{
+    "dialog-state" : {
+        "caseSensitive" : false,
+        "filePatterns" : [
+        ],
+        "path" : "~/sciebo/SPOTSeven.d/Drittmittelprojekte.d/Utopiae.d/Irawan/ccoevolution",
+        "query" : "subfunction",
+        "regex" : false
+    }
+}

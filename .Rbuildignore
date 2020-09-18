@@ -1,8 +1,0 @@
-^.*\.Rproj$
-^\.Rproj\.user$
-.Rdata
-.png
-.txt
-compare.R
-TSCC_group.R
-SACC_group.R

@@ -19,7 +19,7 @@ ML_LSGO <- function(nVar,fun,...,
                     lbound=NULL,ubound=NULL,
                     nLevel=4,eval_interval=100000,
                     SA_method=c('morris_mu','morris_k','rf','sobol'),
-                    maxSeqIter=0,
+                    maxSeqIter=0,disableIPOP=F,
                     fname_prefix='datalogf1_',infill=c("best","ei"),mode='optim',repair=F){
   infill <- infill[1]
   bestPop <- NULL
@@ -98,8 +98,6 @@ ML_LSGO <- function(nVar,fun,...,
       }
     }
     if(SA_method == 'rf') {
-      # cl <- makeCluster(10, type="SOCK")
-      # dopara::registerDoSNOW(cl)
       doParallel::registerDoParallel(3)
       nEval <<- nEval + 20000
 
@@ -254,7 +252,7 @@ ML_LSGO <- function(nVar,fun,...,
 
         valCollection <- NULL
         upperLevel <- levelIndex - 1
-        upperGroup <- group[[upperLevel]]
+        upperGroup <- group[[upperLevel]]#append(group[[upperLevel]],group[[levelIndex]])
         currentGroup <- group[[levelIndex]]
         currentVector <- cv
 
@@ -277,13 +275,14 @@ ML_LSGO <- function(nVar,fun,...,
                            lbound=lbound,
                            ubound=ubound,
                            control=CMAES_control[[upperLevel]],
+                           disableIPOP=disableIPOP,
                            ...)
 
 
         CMAES_control[[upperLevel]]$cov <<- funValue$cov
-        CMAES_control[[upperLevel]]$sigma <<- funValue$sigma
-        CMAES_control[[upperLevel]]$pc <<- funValue$pc
-        CMAES_control[[upperLevel]]$ps <<- funValue$ps
+        # CMAES_control[[upperLevel]]$sigma <<- funValue$sigma
+        # CMAES_control[[upperLevel]]$pc <<- funValue$pc
+        # CMAES_control[[upperLevel]]$ps <<- funValue$ps
 
         CMAES_control[[upperLevel]]$lambda <<- lambda_upper
 

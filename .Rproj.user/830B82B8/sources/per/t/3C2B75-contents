@@ -1,0 +1,105 @@
+rm(list=ls())
+source('R/SACC.R')
+source('R/BL_C.R')
+source('R/multi_level_large_scale.R')
+source('R/multi_BLCMA.R')
+
+source('R/RDG.R')
+source('R/differential_grouping.R')
+
+source('R/support_functions.R')
+source('R/cma_es_with_IPOP.R')
+qq <- 79
+
+library('ccoevolution')
+nVar <- 1000
+optimum <- rep(13,nVar)
+func_set <- c(f8cec,f9cec,f10cec,f11cec)
+nfunc <- length(func_set)
+ctrl <- list(lbound=rep(-100,nVar),ubound=rep(100,nVar),delta=rep(20,nVar))
+budget <- 3000000
+lbound <- rep(-100,nVar)
+ubound <- rep(100,nVar)
+delta <- rep(20,nVar)
+
+group_size <- c(50,50,25,25,100,100,25,25,50,25,100,25,100,50,25,25,25,100,50,25)
+func_index <- (qq-1)%/%75+1
+func <- func_set[[func_index]]
+if(func_index==1){
+  ctrl <- list(lbound=rep(-100,nVar),ubound=rep(100,nVar),delta=rep(20,nVar))
+  lbound <- rep(-100,nVar)
+  ubound <- rep(100,nVar)
+  matfile <- readMat('f08.mat')
+  optimum <- matfile$xopt
+}
+if(func_index==2){
+  ctrl <- list(lbound=rep(-5,nVar),ubound=rep(5,nVar),delta=rep(1,nVar))
+  lbound <- rep(-5,nVar)
+  ubound <- rep(5,nVar)
+  matfile <- readMat('f09.mat')
+  optimum <- matfile$xopt
+}
+if(func_index==3){
+  ctrl <- list(lbound=rep(-32,nVar),ubound=rep(32,nVar),delta=rep(4,nVar))
+  lbound <- rep(-32,nVar)
+  ubound <- rep(32,nVar)
+  matfile <- readMat('f10.mat')
+  optimum <- matfile$xopt
+}
+if(func_index==4){
+  ctrl <- list(lbound=rep(-100,nVar),ubound=rep(100,nVar),delta=rep(20,nVar))
+  lbound <- rep(-100,nVar)
+  ubound <- rep(100,nVar)
+  matfile <- readMat('f11.mat')
+  optimum <- matfile$xopt
+}
+
+res <- NULL
+resVal <- NULL
+methods <- ((qq-1)%%3)+1
+seed <- ((qq-1)%/%3)*1000
+groupStart <- 1
+group <- NULL
+groupEnd <- 0
+permutation <- NULL
+set.seed(seed)
+
+rotation_matrix <- matrix(numeric(1000*1000),nrow=1000)
+nGroup <- length(group_size)
+weight <- matfile$w
+permutation <- matfile$p
+permutation <- 1:1000
+for(i in 1:nGroup){
+  group <- append(group,list(groupEnd+(1:group_size[i])))
+  groupEnd <- groupEnd + group_size[i]
+  if(length(group[[i]])==25)
+    rotation_matrix[group[[i]],group[[i]]] <- matfile$R25
+  if(length(group[[i]])==50)
+    rotation_matrix[group[[i]],group[[i]]] <- matfile$R50
+  if(length(group[[i]])==100)
+    rotation_matrix[group[[i]],group[[i]]] <- matfile$R100
+}
+
+print(paste0('algo',methods,' fun',func_index+7))
+
+bestval <- Inf
+set.seed(seed)
+record <- vector('list')
+
+  print('ML-LSGO')
+#  a <- ML_LSGO(nVar = nVar,fun=func,budget=budget,lbound=lbound,ubound=ubound,o=optimum)
+a <- ML_LSGO2(nVar = nVar,fun=func,budget=budget,nLevel=10,lbound=lbound,ubound=ubound,repair=F,
+             disableIPOP = T,grouping_method = "SA",
+             rotation_matrix=rotation_matrix,maxit_upper=0,
+             o=optimum,
+             weight=weight,
+             permutation=permutation)
+
+res <- cbind(res,a)
+resVal <- cbind(resVal,a$y)
+save(list=ls(),file=paste('algo_ml_lsgo',methods,'_fun',func_index,'_',qq,'.Rdata',sep=''))
+
+# save(list=ls(),file=paste('algo_ml_lsgoalt',methods,'_fun',func_index,'_',qq,'.Rdata',sep=''))
+
+
+

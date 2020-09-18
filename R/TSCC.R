@@ -34,9 +34,11 @@ TSCC <- function(contextVector=NULL,nVar,
                  budget=3000000,lbound=rep(0,nVar),ubound=rep(1,nVar),
                  nLevel=4,evalInterval=100000,
                  SA_method=c('morris_mu','morris_k','rf','sobol'),
-                 keepCovariance=F,scale=T){
+                 keepCovariance=F,scale=T,disableIPOP=F){
 
   ########### initialization ###############
+  recordConv <- NULL
+  recordNEval <- NULL
   if(!is.null(contextVector))
     nVar <- length(contextVector)
   SA_method <- SA_method[1]
@@ -465,22 +467,22 @@ TSCC <- function(contextVector=NULL,nVar,
             }
           }
 
-          nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
-          if(nlogging_this_layer>0){
-            for(i in 1:nlogging_this_layer){
-              nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
-              nGeneration_to_consider <- floor(nEval_to_logging/lambda)
-              # print(c('record sep',nGeneration_to_consider,nlogging_this_layer,mu,dim(best$diagnostic$value)))
-              #print(best$diagnostic)
-              if(!is.matrix(best$diagnostic$value)){
-                best$diagnostic$value <- matrix(best$diagnostic$value)
-              }
-
-              bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
-              convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
-
-            }
-          }
+          # nlogging_this_layer <- floor((nEval+best$counts[1])/evalInterval)-floor(nEval/evalInterval)
+          # if(nlogging_this_layer>0){
+          #   for(i in 1:nlogging_this_layer){
+          #     nEval_to_logging <- (evalInterval*i) - nEval%%evalInterval
+          #     nGeneration_to_consider <- floor(nEval_to_logging/lambda)
+          #     # print(c('record sep',nGeneration_to_consider,nlogging_this_layer,mu,dim(best$diagnostic$value)))
+          #     #print(best$diagnostic)
+          #     if(!is.matrix(best$diagnostic$value)){
+          #       best$diagnostic$value <- matrix(best$diagnostic$value)
+          #     }
+          #
+          #     bestObj_logging <- min(best$diagnostic$value[1:nGeneration_to_consider,])
+          #     convergence_history <- append(convergence_history,min(bestObj_logging,convergence_history[length(convergence_history)],bestObj))
+          #
+          #   }
+          # }
           nEval <- nEval + best$counts[1]
 
 
@@ -491,6 +493,9 @@ TSCC <- function(contextVector=NULL,nVar,
               if(obj < bestObj){
                 bestPop <- contextVector
                 bestObj <- obj
+
+                recordConv <- append(recordConv,bestObj)
+                recordNEval <- append(recordNEval,nEval)
               }
             }else{
               #      # print('is null')
@@ -523,7 +528,8 @@ TSCC <- function(contextVector=NULL,nVar,
                         upper=ubound[groupMember],
                         control = CMAES_control[[clusterIndex]]$nonsep[[groupIndex]],
                         inputScaleFactor=scaling_factor[groupMember],
-                        inputScaleShift=scaling_shift[groupMember])
+                        inputScaleShift=scaling_shift[groupMember],
+                        disableIPOP=disableIPOP)
           termination_code <- best$termination_code
           term_code_total <- term_code_total + 1
 
@@ -657,6 +663,8 @@ TSCC <- function(contextVector=NULL,nVar,
                 print('UPDATE!')
                 bestPop <- contextVector
                 bestObj <- obj
+                recordConv <- append(recordConv,bestObj)
+                recordNEval <- append(recordNEval,nEval)
               }
             }else{
 
@@ -689,5 +697,5 @@ TSCC <- function(contextVector=NULL,nVar,
         }
     }
   }
-  return(list(x=bestPop,y=bestObj,conv=convergence_history))
+  return(list(x=bestPop,y=bestObj,record=list(nEval=recordNEval,conv=recordConv)))
 }
